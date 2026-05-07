@@ -17,8 +17,10 @@ name = "praxis_core"
 workspace = true
 
 [dependencies]
+dashmap = { workspace = true }
 pingora-core = { workspace = true }
 praxis-tls = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 thiserror = { workspace = true }

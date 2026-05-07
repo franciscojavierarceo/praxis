@@ -656,6 +656,7 @@ default_upstream: "10.0.0.1:443"
             upstream_addr: None,
             cluster: None,
             health_registry: None,
+            kv_stores: None,
             connect_time: Instant::now(),
             bytes_in: 0,
             bytes_out: 0,

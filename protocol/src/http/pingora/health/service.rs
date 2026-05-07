@@ -33,7 +33,7 @@ use crate::http::pingora::json::json_response;
 /// ```
 ///
 /// [RFC 8259 Section 7]: https://datatracker.ietf.org/doc/html/rfc8259#section-7
-pub(crate) fn escape_json_string(s: &str) -> String {
+pub(in crate::http::pingora) fn escape_json_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for ch in s.chars() {
         match ch {

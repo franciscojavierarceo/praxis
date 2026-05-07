@@ -79,7 +79,8 @@ fn validate_config(config: &praxis_core::config::Config) -> Result<(), Box<dyn s
     praxis_core::logging::validate_log_overrides(config)?;
     let registry = praxis_filter::FilterRegistry::with_builtins();
     let health_registry = praxis_core::health::build_health_registry(&config.clusters);
-    praxis::resolve_pipelines(config, &registry, &health_registry)?;
+    let kv_stores = praxis_core::kv::KvStoreRegistry::new();
+    praxis::resolve_pipelines(config, &registry, &health_registry, &kv_stores)?;
     Ok(())
 }
 

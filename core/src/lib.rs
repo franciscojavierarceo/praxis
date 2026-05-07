@@ -14,6 +14,8 @@ pub mod connectivity;
 pub mod errors;
 /// Shared health state types for active health checking.
 pub mod health;
+/// Key-value store trait and registry.
+pub mod kv;
 /// Tracing subscriber setup.
 pub mod logging;
 /// Server factory and runtime options.

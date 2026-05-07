@@ -20,6 +20,8 @@ pub mod handler;
 /// Health check infrastructure: admin endpoints, probes, and background runner.
 pub mod health;
 pub(crate) mod json;
+/// Admin endpoints for runtime key-value store CRUD.
+pub mod kv;
 /// Listener configuration and TLS setup.
 pub mod listener;
 

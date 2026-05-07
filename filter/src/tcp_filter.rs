@@ -6,7 +6,7 @@
 use std::{borrow::Cow, sync::Arc, time::Instant};
 
 use async_trait::async_trait;
-use praxis_core::health::HealthRegistry;
+use praxis_core::{health::HealthRegistry, kv::KvStoreRegistry};
 
 use crate::{actions::FilterAction, filter::FilterError};
 
@@ -47,6 +47,7 @@ use crate::{actions::FilterAction, filter::FilterError};
 ///     upstream_addr: Some(Cow::Borrowed("10.0.0.1:80")),
 ///     cluster: None,
 ///     health_registry: None,
+///     kv_stores: None,
 ///     connect_time: Instant::now(),
 ///     bytes_in: 0,
 ///     bytes_out: 0,
@@ -101,6 +102,9 @@ pub struct TcpFilterContext<'a> {
     /// Shared health registry for endpoint health lookups.
     pub health_registry: Option<&'a HealthRegistry>,
 
+    /// Named key-value stores for runtime mappings.
+    pub kv_stores: Option<&'a KvStoreRegistry>,
+
     /// When the connection was accepted.
     pub connect_time: Instant,
 
@@ -136,6 +140,7 @@ mod tests {
             upstream_addr: Some(Cow::Borrowed("10.0.0.1:5432")),
             cluster: None,
             health_registry: None,
+            kv_stores: None,
             connect_time: Instant::now(),
             bytes_in: 0,
             bytes_out: 0,
@@ -154,6 +159,7 @@ mod tests {
             upstream_addr: Some(Cow::Borrowed("10.0.0.1:5432")),
             cluster: None,
             health_registry: None,
+            kv_stores: None,
             connect_time: Instant::now(),
             bytes_in: 0,
             bytes_out: 0,

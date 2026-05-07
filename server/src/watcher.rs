@@ -46,6 +46,9 @@ pub(crate) struct WatcherParams {
     /// Initial config for diffing against reloaded versions.
     pub(crate) initial_config: Config,
 
+    /// KV store registry, preserved across reloads.
+    pub(crate) kv_stores: praxis_core::kv::KvStoreRegistry,
+
     /// Live pipeline storage, swapped atomically on reload.
     pub(crate) pipelines: Arc<ListenerPipelines>,
 
@@ -117,6 +120,7 @@ async fn run_event_loop(rx: &mut mpsc::Receiver<()>, params: &WatcherParams) {
                     &params.registry,
                     &params.pipelines,
                     &params.health_shutdown,
+                    &params.kv_stores,
                 );
             }
             () = params.shutdown.cancelled() => {
@@ -128,12 +132,18 @@ async fn run_event_loop(rx: &mut mpsc::Receiver<()>, params: &WatcherParams) {
 }
 
 /// Read the config file, parse it, and attempt a reload.
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    reason = "orchestration function"
+)]
 fn handle_reload(
     config_path: &PathBuf,
     current_config: &mut Config,
     registry: &FilterRegistry,
     pipelines: &ListenerPipelines,
     health_shutdown: &Arc<Mutex<CancellationToken>>,
+    kv_stores: &praxis_core::kv::KvStoreRegistry,
 ) {
     let content = match std::fs::read_to_string(config_path) {
         Ok(c) => c,
@@ -159,7 +169,14 @@ fn handle_reload(
         },
     };
 
-    match reload_pipelines(&new_config, current_config, registry, pipelines, health_shutdown) {
+    match reload_pipelines(
+        &new_config,
+        current_config,
+        registry,
+        pipelines,
+        health_shutdown,
+        kv_stores,
+    ) {
         Ok(()) => {
             *current_config = new_config;
         },
@@ -249,7 +266,9 @@ mod tests {
         let config = Config::from_yaml(VALID_YAML).unwrap();
         let registry = Arc::new(FilterRegistry::with_builtins());
         let health_registry = Arc::new(std::collections::HashMap::new());
-        let pipelines = Arc::new(crate::pipelines::resolve_pipelines(&config, &registry, &health_registry).unwrap());
+        let kv_stores = praxis_core::kv::KvStoreRegistry::new();
+        let pipelines =
+            Arc::new(crate::pipelines::resolve_pipelines(&config, &registry, &health_registry, &kv_stores).unwrap());
         let health_shutdown = Arc::new(Mutex::new(CancellationToken::new()));
         let shutdown = CancellationToken::new();
 
@@ -257,6 +276,7 @@ mod tests {
             config_path,
             health_shutdown,
             initial_config: config,
+            kv_stores: praxis_core::kv::KvStoreRegistry::new(),
             pipelines,
             registry,
             shutdown: shutdown.clone(),
@@ -277,7 +297,9 @@ mod tests {
         let config = Config::from_yaml(VALID_YAML).unwrap();
         let registry = Arc::new(FilterRegistry::with_builtins());
         let health_registry = Arc::new(std::collections::HashMap::new());
-        let pipelines = Arc::new(crate::pipelines::resolve_pipelines(&config, &registry, &health_registry).unwrap());
+        let kv_stores = praxis_core::kv::KvStoreRegistry::new();
+        let pipelines =
+            Arc::new(crate::pipelines::resolve_pipelines(&config, &registry, &health_registry, &kv_stores).unwrap());
         let old_ptr = Arc::as_ptr(&pipelines.get("web").unwrap().load());
         let health_shutdown = Arc::new(Mutex::new(CancellationToken::new()));
         let shutdown = CancellationToken::new();
@@ -286,6 +308,7 @@ mod tests {
             config_path: config_path.clone(),
             health_shutdown,
             initial_config: config,
+            kv_stores: praxis_core::kv::KvStoreRegistry::new(),
             pipelines: Arc::clone(&pipelines),
             registry: Arc::clone(&registry),
             shutdown: shutdown.clone(),
@@ -312,7 +335,9 @@ mod tests {
         let config = Config::from_yaml(VALID_YAML).unwrap();
         let registry = Arc::new(FilterRegistry::with_builtins());
         let health_registry = Arc::new(std::collections::HashMap::new());
-        let pipelines = Arc::new(crate::pipelines::resolve_pipelines(&config, &registry, &health_registry).unwrap());
+        let kv_stores = praxis_core::kv::KvStoreRegistry::new();
+        let pipelines =
+            Arc::new(crate::pipelines::resolve_pipelines(&config, &registry, &health_registry, &kv_stores).unwrap());
         let old_ptr = Arc::as_ptr(&pipelines.get("web").unwrap().load());
         let health_shutdown = Arc::new(Mutex::new(CancellationToken::new()));
         let shutdown = CancellationToken::new();
@@ -321,6 +346,7 @@ mod tests {
             config_path: config_path.clone(),
             health_shutdown,
             initial_config: config,
+            kv_stores: praxis_core::kv::KvStoreRegistry::new(),
             pipelines: Arc::clone(&pipelines),
             registry: Arc::clone(&registry),
             shutdown: shutdown.clone(),

@@ -898,6 +898,61 @@ runtime:
 This is useful for debugging a specific subsystem without
 flooding output from every module.
 
+## Key-Value Stores
+
+In-memory key-value stores for runtime-updatable
+mappings. Stores are created dynamically by filters
+at runtime via `KvStoreRegistry::get_or_create` and
+managed through the admin API. No YAML configuration
+is required.
+
+Filters access stores by name through
+`HttpFilterContext` and `TcpFilterContext`.
+
+### Match Types
+
+Stores support four match types for key lookup:
+
+| Type | Behavior |
+| ---- | -------- |
+| `exact` | Key must equal the lookup key |
+| `prefix` | Stored key starts with the pattern |
+| `suffix` | Stored key ends with the pattern |
+| `regex` | Stored key matches a regex pattern |
+
+### Admin API
+
+When `admin.address` is configured, CRUD endpoints
+are available:
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/api/kv/{store}` | List all entries |
+| `GET` | `/api/kv/{store}/{key}` | Get a value |
+| `PUT` | `/api/kv/{store}/{key}` | Set a value (body) |
+| `DELETE` | `/api/kv/{store}/{key}` | Delete a key |
+
+Writes are immediately visible to all filters on all
+threads. Unknown store names return 404.
+
+### Runtime Cache Semantics
+
+Key-value stores are **runtime caches, not durable
+storage**. Data lives in memory and is lost on process
+exit.
+
+The store is designed for operational overrides (routing
+tables, feature flags, config knobs) that can be
+reconstructed from an external source of truth. Do not
+use it as a primary data store.
+
+### Pluggable Backends
+
+The `KvBackend` trait allows alternative implementations
+(e.g. Redis). The default `InMemoryKvBackend` uses
+DashMap for lock-free reads. See the `praxis_core::kv`
+module docs for the trait definition.
+
 ## Graceful Shutdown
 
 The `shutdown_timeout_secs` field controls how long the
@@ -938,7 +993,7 @@ by category:
 | `transformation` | Header manipulation, path rewriting, URL rewriting |
 | `protocols` | TCP, TLS, mixed protocol configs |
 | `pipeline` | Filter chain composition and conditions |
-| `operations` | Production gateway, multi-listener |
+| `operations` | Production gateway, multi-listener, admin |
 
 ## Validation and Security
 

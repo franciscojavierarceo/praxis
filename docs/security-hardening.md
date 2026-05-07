@@ -37,6 +37,10 @@ ambiguous configuration:
   internal admin or health-check endpoints.
 - Restrict admin and metrics endpoints to internal
   networks or loopback addresses.
+- Restrict admin endpoints (including KV store API) to
+  internal networks or loopback addresses. The KV admin
+  API allows runtime modification of routing and
+  transformation data.
 
 ## TLS Best Practices
 

@@ -80,16 +80,25 @@ pub fn run_server_with_registry(config: Config, registry: FilterRegistry, config
     warn_insecure_key_permissions(&config);
 
     let health_registry = build_health_registry(&config.clusters);
-    let pipelines = resolve_pipelines(&config, &registry, &health_registry).unwrap_or_else(|e| fatal(&e));
+    let kv_stores = praxis_core::kv::KvStoreRegistry::new();
+    let pipelines = resolve_pipelines(&config, &registry, &health_registry, &kv_stores).unwrap_or_else(|e| fatal(&e));
     let pipelines = Arc::new(pipelines);
 
     info!("initializing server");
     let mut server = PingoraServerRuntime::new(&config);
     let _cert_shutdowns = register_protocols(&mut server, &config, &pipelines);
 
+    if let Some(ref admin_addr) = config.admin.address {
+        praxis_protocol::http::pingora::kv::add_kv_endpoint_to_pingora_server(
+            server.server_mut(),
+            admin_addr,
+            kv_stores.clone(),
+        );
+    }
+
     let health_shutdown = Arc::new(Mutex::new(CancellationToken::new()));
     spawn_health_check_tasks(&config, &health_registry, &health_shutdown);
-    let _watcher = spawn_watcher(config_path, config, registry, &pipelines, &health_shutdown);
+    let _watcher = spawn_watcher(config_path, config, registry, &pipelines, &health_shutdown, kv_stores);
 
     info!("starting server");
     server.run()
@@ -121,18 +130,21 @@ fn register_protocols(
 }
 
 /// Spawn the config file watcher if a config path is available.
+#[allow(clippy::too_many_arguments, reason = "orchestration function")]
 fn spawn_watcher(
     config_path: Option<PathBuf>,
     config: Config,
     registry: FilterRegistry,
     pipelines: &Arc<ListenerPipelines>,
     health_shutdown: &Arc<Mutex<CancellationToken>>,
+    kv_stores: praxis_core::kv::KvStoreRegistry,
 ) -> Option<std::thread::JoinHandle<()>> {
     let path = config_path?;
     let handle = crate::watcher::spawn_config_watcher(crate::watcher::WatcherParams {
         config_path: path,
         health_shutdown: Arc::clone(health_shutdown),
         initial_config: config,
+        kv_stores,
         pipelines: Arc::clone(pipelines),
         registry: Arc::new(registry),
         shutdown: CancellationToken::new(),

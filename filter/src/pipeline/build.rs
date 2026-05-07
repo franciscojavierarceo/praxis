@@ -51,6 +51,7 @@ impl FilterPipeline {
             compression,
             filters,
             health_registry: None,
+            kv_stores: None,
         })
     }
 
@@ -79,6 +80,7 @@ impl FilterPipeline {
             compression,
             filters,
             health_registry: None,
+            kv_stores: None,
         })
     }
 

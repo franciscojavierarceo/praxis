@@ -159,6 +159,13 @@ deployment guidance.
   TCP closes immediately
 - **Runtime tuning** - thread pool sizing and
   work-stealing toggle
+- **Runtime key-value stores** - in-memory runtime caches
+  created dynamically by filters. Admin API
+  (GET/PUT/DELETE) and exact/prefix/suffix/regex match
+  types. Pluggable `KvBackend` trait for alternative
+  backends. Accessible from all filter contexts. Designed
+  for operational overrides (routing tables, feature
+  flags), not durable storage.
 
 ## Protocols
 

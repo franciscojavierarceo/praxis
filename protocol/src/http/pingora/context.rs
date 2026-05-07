@@ -164,6 +164,7 @@ macro_rules! filter_context {
             filter_metadata: std::mem::take(&mut $ctx.filter_metadata),
             filter_results: std::collections::HashMap::new(),
             health_registry: $pipeline.health_registry(),
+            kv_stores: $pipeline.kv_stores(),
             request: $request,
             request_body_bytes: $ctx.request_body_bytes,
             request_body_mode: $ctx.request_body_mode,

@@ -10,4 +10,5 @@ pub mod runner;
 /// Admin health-check HTTP service (`/ready`, `/healthy`).
 mod service;
 
+pub(in crate::http::pingora) use service::escape_json_string;
 pub use service::{PingoraHealthService, add_health_endpoint_to_pingora_server};

@@ -31,7 +31,7 @@ mod tcp;
 )]
 mod tests;
 
-use praxis_core::{config::FailureMode, health::HealthRegistry};
+use praxis_core::{config::FailureMode, health::HealthRegistry, kv::KvStoreRegistry};
 use tracing::warn;
 
 use self::filter::PipelineFilter;
@@ -66,6 +66,9 @@ pub struct FilterPipeline {
 
     /// Shared health registry for endpoint health lookups.
     health_registry: Option<HealthRegistry>,
+
+    /// Named key-value stores for runtime mappings.
+    kv_stores: Option<KvStoreRegistry>,
 }
 
 impl FilterPipeline {
@@ -141,6 +144,16 @@ impl FilterPipeline {
     /// The shared health registry, if set.
     pub fn health_registry(&self) -> Option<&HealthRegistry> {
         self.health_registry.as_ref()
+    }
+
+    /// The shared KV store registry, if set.
+    pub fn kv_stores(&self) -> Option<&KvStoreRegistry> {
+        self.kv_stores.as_ref()
+    }
+
+    /// Set the shared [`KvStoreRegistry`] for this pipeline.
+    pub fn set_kv_stores(&mut self, stores: KvStoreRegistry) {
+        self.kv_stores = Some(stores);
     }
 }
 

@@ -444,6 +444,7 @@ mod tests {
             compression: None,
             filters,
             health_registry: None,
+            kv_stores: None,
         }
     }
 
@@ -456,6 +457,7 @@ mod tests {
             upstream_addr: Some(std::borrow::Cow::Borrowed("10.0.0.1:80")),
             cluster: None,
             health_registry: None,
+            kv_stores: None,
             connect_time: std::time::Instant::now(),
             bytes_in: 0,
             bytes_out: 0,

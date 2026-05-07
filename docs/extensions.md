@@ -392,6 +392,35 @@ via `ctx.extra_request_headers`. This makes the value
 visible to downstream filters (e.g. the router) without
 coupling filters to each other.
 
+### Access KV stores for runtime mappings
+
+Use `ctx.kv_stores` with `get_or_create` to access
+runtime-updatable key-value data without restarting
+the proxy. Stores are created on demand:
+
+```rust
+async fn on_request(
+    &self,
+    ctx: &mut HttpFilterContext<'_>,
+) -> Result<FilterAction, FilterError> {
+    if let Some(registry) = ctx.kv_stores {
+        let store = registry.get_or_create("routing_overrides");
+        if let Some(cluster) = store.get("preferred_cluster") {
+            ctx.cluster = Some(Arc::from(cluster.as_ref()));
+        }
+    }
+    Ok(FilterAction::Continue)
+}
+```
+
+Operators update stores at runtime via the admin API
+without config reloads:
+
+```console
+curl -X PUT http://127.0.0.1:9901/api/kv/routing_overrides/preferred_cluster \
+     -d 'us-east-cluster'
+```
+
 ### Handle missing `ctx.cluster` gracefully
 
 If your filter depends on a cluster being set (like a

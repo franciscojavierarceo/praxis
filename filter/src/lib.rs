@@ -235,6 +235,7 @@ pub(crate) mod test_utils {
             filter_metadata: std::collections::HashMap::new(),
             filter_results: std::collections::HashMap::new(),
             health_registry: None,
+            kv_stores: None,
             request: req,
             request_body_bytes: 0,
             request_body_mode: crate::body::BodyMode::Stream,

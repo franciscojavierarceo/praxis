@@ -2063,8 +2063,10 @@ dependencies = [
 name = "praxis-proxy-core"
 version = "0.1.0"
 dependencies = [
+ "dashmap",
  "pingora-core",
  "praxis-proxy-tls",
+ "regex",
  "serde",
  "serde_yaml",
  "thiserror 2.0.18",

@@ -6,7 +6,7 @@
 use std::{borrow::Cow, collections::HashMap, net::IpAddr, sync::Arc, time::Instant};
 
 use http::{HeaderMap, Method, StatusCode, Uri};
-use praxis_core::{connectivity::Upstream, health::HealthRegistry};
+use praxis_core::{connectivity::Upstream, health::HealthRegistry, kv::KvStoreRegistry};
 
 use crate::{body::BodyMode, pipeline::body::merge_body_mode, results::FilterResultSet};
 
@@ -63,6 +63,9 @@ pub struct HttpFilterContext<'a> {
 
     /// Shared health registry for endpoint health lookups.
     pub health_registry: Option<&'a HealthRegistry>,
+
+    /// Named key-value stores for runtime mappings.
+    pub kv_stores: Option<&'a KvStoreRegistry>,
 
     /// Transport-agnostic request headers, URI, and method.
     pub request: &'a Request,
@@ -451,6 +454,90 @@ mod tests {
             ctx.get_metadata("a2a.task_id"),
             Some("task-456"),
             "set_metadata should accept owned Strings"
+        );
+    }
+
+    #[test]
+    fn kv_stores_returns_none_when_unset() {
+        let req = crate::test_utils::make_request(Method::GET, "/");
+        let ctx = crate::test_utils::make_filter_context(&req);
+        assert!(ctx.kv_stores.is_none(), "kv_stores should be None when unset");
+    }
+
+    #[test]
+    fn kv_stores_returns_registry_when_set() {
+        let registry = KvStoreRegistry::new();
+        let store = registry.get_or_create("routing");
+        store.set("model", Arc::from("gpt-4"));
+
+        let req = crate::test_utils::make_request(Method::GET, "/");
+        let mut ctx = crate::test_utils::make_filter_context(&req);
+        ctx.kv_stores = Some(&registry);
+
+        let store = ctx.kv_stores.unwrap().get("routing").unwrap();
+        assert_eq!(
+            store.get("model").as_deref(),
+            Some("gpt-4"),
+            "filter should read KV store via context"
+        );
+    }
+
+    #[test]
+    fn kv_stores_write_from_context_is_visible() {
+        let registry = KvStoreRegistry::new();
+        let store = registry.get_or_create("flags");
+
+        let req = crate::test_utils::make_request(Method::GET, "/");
+        let mut ctx = crate::test_utils::make_filter_context(&req);
+        ctx.kv_stores = Some(&registry);
+
+        ctx.kv_stores
+            .unwrap()
+            .get("flags")
+            .unwrap()
+            .set("dark_mode", Arc::from("true"));
+        assert_eq!(
+            store.get("dark_mode").as_deref(),
+            Some("true"),
+            "write through context should be visible on the original store"
+        );
+    }
+
+    #[test]
+    fn kv_stores_missing_store_returns_none() {
+        let registry = KvStoreRegistry::new();
+
+        let req = crate::test_utils::make_request(Method::GET, "/");
+        let mut ctx = crate::test_utils::make_filter_context(&req);
+        ctx.kv_stores = Some(&registry);
+
+        assert!(
+            ctx.kv_stores.unwrap().get("nonexistent").is_none(),
+            "missing store name should return None"
+        );
+    }
+
+    #[test]
+    fn kv_stores_lookup_with_match_types() {
+        use praxis_core::kv::MatchType;
+
+        let registry = KvStoreRegistry::new();
+        let store = registry.get_or_create("routes");
+        store.set("route.api.v1", Arc::from("api_cluster"));
+        store.set("route.web.main", Arc::from("web_cluster"));
+
+        let req = crate::test_utils::make_request(Method::GET, "/");
+        let mut ctx = crate::test_utils::make_filter_context(&req);
+        ctx.kv_stores = Some(&registry);
+
+        let store = ctx.kv_stores.unwrap().get("routes").unwrap();
+        assert!(
+            store.lookup("route.api", MatchType::Prefix).is_some(),
+            "prefix lookup should match route.api.v1"
+        );
+        assert!(
+            store.lookup(".main", MatchType::Suffix).is_some(),
+            "suffix lookup should match route.web.main"
         );
     }
 }

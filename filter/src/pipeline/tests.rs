@@ -622,6 +622,7 @@ fn apply_body_limits_no_limits_leaves_stream_mode() {
         compression: None,
         filters: vec![],
         health_registry: None,
+        kv_stores: None,
     };
     pipeline.apply_body_limits(None, None, false).unwrap();
 
@@ -653,6 +654,7 @@ fn apply_body_limits_request_limit_uses_size_limit_mode() {
         compression: None,
         filters: vec![],
         health_registry: None,
+        kv_stores: None,
     };
     pipeline.apply_body_limits(Some(1_048_576), None, false).unwrap();
     let caps = pipeline.body_capabilities();
@@ -680,6 +682,7 @@ fn apply_body_limits_response_limit_uses_size_limit_mode() {
         compression: None,
         filters: vec![],
         health_registry: None,
+        kv_stores: None,
     };
     pipeline.apply_body_limits(None, Some(524_288), false).unwrap();
     let caps = pipeline.body_capabilities();
@@ -707,6 +710,7 @@ fn apply_body_limits_both_applied_independently() {
         compression: None,
         filters: vec![],
         health_registry: None,
+        kv_stores: None,
     };
     pipeline.apply_body_limits(Some(1_024), Some(2_048), false).unwrap();
     let caps = pipeline.body_capabilities();
@@ -1278,6 +1282,7 @@ fn apply_body_limits_stream_uses_size_limit() {
         compression: None,
         filters: vec![],
         health_registry: None,
+        kv_stores: None,
     };
     pipeline.apply_body_limits(Some(4096), Some(8192), false).unwrap();
     assert_eq!(
@@ -1302,6 +1307,7 @@ fn apply_body_limits_filter_stricter_than_config() {
         compression: None,
         filters: vec![],
         health_registry: None,
+        kv_stores: None,
     };
     pipeline.apply_body_limits(Some(1000), None, false).unwrap();
     assert_eq!(
@@ -1323,6 +1329,7 @@ fn apply_body_limits_config_stricter_than_filter() {
         compression: None,
         filters: vec![],
         health_registry: None,
+        kv_stores: None,
     };
     pipeline.apply_body_limits(Some(1000), None, false).unwrap();
     assert_eq!(
@@ -1344,6 +1351,7 @@ fn apply_body_limits_rejects_unbounded_stream_buffer() {
         compression: None,
         filters: vec![],
         health_registry: None,
+        kv_stores: None,
     };
     let err = pipeline.apply_body_limits(None, None, false).unwrap_err();
     assert!(
@@ -1364,6 +1372,7 @@ fn apply_body_limits_allows_unbounded_stream_buffer_with_override() {
         compression: None,
         filters: vec![],
         health_registry: None,
+        kv_stores: None,
     };
     pipeline
         .apply_body_limits(None, None, true)
@@ -1570,6 +1579,7 @@ async fn skip_to_excludes_skipped_filters_from_response() {
         compression: None,
         filters: vec![filter_a, filter_b, filter_c],
         health_registry: None,
+        kv_stores: None,
     };
 
     let req = crate::test_utils::make_request(Method::GET, "/");
@@ -1612,6 +1622,7 @@ async fn all_executed_filters_run_on_response() {
             ),
         ],
         health_registry: None,
+        kv_stores: None,
     };
 
     let req = crate::test_utils::make_request(Method::GET, "/");
@@ -1661,6 +1672,7 @@ async fn skipped_filter_skips_its_branches() {
         compression: None,
         filters: vec![parent],
         health_registry: None,
+        kv_stores: None,
     };
 
     let req = crate::test_utils::make_request(Method::GET, "/other");
@@ -2673,6 +2685,7 @@ fn make_pipeline(filters: Vec<Box<dyn HttpFilter>>) -> FilterPipeline {
         compression: None,
         filters,
         health_registry: None,
+        kv_stores: None,
     }
 }
 
@@ -2691,6 +2704,7 @@ fn make_pipeline_with_conditions(
         compression: None,
         filters,
         health_registry: None,
+        kv_stores: None,
     }
 }
 
@@ -2709,6 +2723,7 @@ fn make_pipeline_with_response_conditions(
         compression: None,
         filters,
         health_registry: None,
+        kv_stores: None,
     }
 }
 

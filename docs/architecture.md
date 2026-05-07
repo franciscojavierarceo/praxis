@@ -341,7 +341,9 @@ handlers, starts the server. Exposes `run_server` and
 
 **`praxis-core`** : Configuration types (YAML parsing via
 serde), validation, error types, upstream connectivity
-options, and the `PingoraServerRuntime` wrapper.
+options, `KvStoreRegistry` (concurrent registry of
+dynamic key-value stores with pluggable backends), and
+the `PingoraServerRuntime` wrapper.
 
 **`praxis-filter`** : Filter pipeline engine. Defines the
 `HttpFilter` and `TcpFilter` traits, condition evaluation,
@@ -427,6 +429,8 @@ praxis-core                     Configuration, errors, and server factory
 │   └── upstream                Upstream address representation
 ├── errors                      ProxyError (shared workspace error type)
 ├── health                      Shared health state types for active health checking
+├── kv/                         Key-value store trait and registry
+│   └── memory                  In-memory backend (DashMap)
 ├── logging                     Tracing subscriber setup
 └── server/                     Server factory and lifecycle
     ├── pingora                 Pingora server configuration
@@ -510,6 +514,7 @@ praxis-protocol                 Protocol adapters
 │       │   ├── runner          Background health check runner
 │       │   └── service         Admin health-check service (/ready, /healthy)
 │       ├── json                JSON HTTP response builder
+│       ├── kv                  KV store admin CRUD endpoints
 │       ├── listener            TCP/TLS listener setup
 │       └── handler/            Request/response lifecycle hooks
 │           ├── hop_by_hop           Shared hop-by-hop header stripping logic
@@ -587,6 +592,8 @@ sequenceDiagram
     M->>M: init_tracing(&config)
     M->>R: FilterRegistry::with_builtins()
     Note right of R: name → FilterFactory::Http | Tcp
+    M->>M: KvStoreRegistry::new()
+    Note right of M: dynamic, on-demand store creation
 
     Note over M,LP: resolve_pipelines(&config, &registry)
     M->>M: index filter_chains: HashMap<name, &[FilterEntry]>
@@ -595,6 +602,7 @@ sequenceDiagram
         M->>R: registry.create(type, yaml) per entry → AnyFilter
         M->>M: FilterPipeline{Vec<ConditionalFilter>, BodyCapabilities}
         M->>M: apply_body_limits(max_req, max_resp)
+        M->>M: pipeline.set_kv_stores(kv_registry)
         M->>LP: insert(listener.name, Arc<FilterPipeline>)
     end
 

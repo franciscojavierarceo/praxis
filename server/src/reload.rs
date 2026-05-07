@@ -31,19 +31,24 @@ use crate::pipelines::resolve_pipelines;
 ///
 /// Returns an error if the new config fails validation or pipeline
 /// construction. The running server is unaffected.
-#[allow(clippy::too_many_lines, reason = "orchestration function")]
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    reason = "orchestration function"
+)]
 pub(crate) fn reload_pipelines(
     new_config: &Config,
     old_config: &Config,
     registry: &FilterRegistry,
     live: &ListenerPipelines,
     health_shutdown: &Arc<Mutex<CancellationToken>>,
+    kv_stores: &praxis_core::kv::KvStoreRegistry,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("building new pipelines from reloaded config");
 
     let health_registry = build_health_registry(&new_config.clusters);
 
-    let new_pipelines = match resolve_pipelines(new_config, registry, &health_registry) {
+    let new_pipelines = match resolve_pipelines(new_config, registry, &health_registry, kv_stores) {
         Ok(p) => p,
         Err(e) => {
             error!(error = %e, "config reload failed: pipeline build error");
@@ -292,7 +297,14 @@ mod tests {
         let old_ptr = Arc::as_ptr(&live.get("web").unwrap().load());
 
         let new_config = valid_config();
-        let result = reload_pipelines(&new_config, &old_config, &registry, &live, &shutdown);
+        let result = reload_pipelines(
+            &new_config,
+            &old_config,
+            &registry,
+            &live,
+            &shutdown,
+            &empty_kv_stores(),
+        );
 
         assert!(result.is_ok(), "valid reload should succeed");
         let new_ptr = Arc::as_ptr(&live.get("web").unwrap().load());
@@ -318,7 +330,14 @@ filter_chains:
         )
         .unwrap();
 
-        let result = reload_pipelines(&bad_config, &old_config, &registry, &live, &shutdown);
+        let result = reload_pipelines(
+            &bad_config,
+            &old_config,
+            &registry,
+            &live,
+            &shutdown,
+            &empty_kv_stores(),
+        );
         assert!(result.is_err(), "invalid filter should return Err");
 
         let current_ptr = Arc::as_ptr(&live.get("web").unwrap().load());
@@ -331,7 +350,15 @@ filter_chains:
         let old_token = shutdown.lock().unwrap().clone();
 
         let new_config = valid_config();
-        reload_pipelines(&new_config, &old_config, &registry, &live, &shutdown).unwrap();
+        reload_pipelines(
+            &new_config,
+            &old_config,
+            &registry,
+            &live,
+            &shutdown,
+            &empty_kv_stores(),
+        )
+        .unwrap();
 
         assert!(
             old_token.is_cancelled(),
@@ -345,7 +372,15 @@ filter_chains:
         let old_token = shutdown.lock().unwrap().clone();
 
         let new_config = valid_config();
-        reload_pipelines(&new_config, &old_config, &registry, &live, &shutdown).unwrap();
+        reload_pipelines(
+            &new_config,
+            &old_config,
+            &registry,
+            &live,
+            &shutdown,
+            &empty_kv_stores(),
+        )
+        .unwrap();
 
         let new_token = shutdown.lock().unwrap().clone();
         assert!(
@@ -374,7 +409,14 @@ filter_chains:
         )
         .unwrap();
 
-        let _err = reload_pipelines(&bad_config, &old_config, &registry, &live, &shutdown);
+        let _err = reload_pipelines(
+            &bad_config,
+            &old_config,
+            &registry,
+            &live,
+            &shutdown,
+            &empty_kv_stores(),
+        );
         assert!(
             !old_token.is_cancelled(),
             "health check token should not be cancelled on validation failure"
@@ -403,7 +445,14 @@ filter_chains:
         )
         .unwrap();
 
-        let result = reload_pipelines(&new_config, &old_config, &registry, &live, &shutdown);
+        let result = reload_pipelines(
+            &new_config,
+            &old_config,
+            &registry,
+            &live,
+            &shutdown,
+            &empty_kv_stores(),
+        );
         assert!(result.is_ok(), "reload with new listener should succeed");
         assert!(
             live.get("new_listener").is_none(),
@@ -561,8 +610,13 @@ filter_chains:
         let config = valid_config();
         let registry = FilterRegistry::with_builtins();
         let health_registry: HealthRegistry = Arc::new(HashMap::new());
-        let pipelines = resolve_pipelines(&config, &registry, &health_registry).unwrap();
+        let pipelines = resolve_pipelines(&config, &registry, &health_registry, &empty_kv_stores()).unwrap();
         let shutdown = Arc::new(Mutex::new(CancellationToken::new()));
         (pipelines, config, registry, shutdown)
+    }
+
+    /// Empty KV store registry for tests without KV stores.
+    fn empty_kv_stores() -> praxis_core::kv::KvStoreRegistry {
+        praxis_core::kv::KvStoreRegistry::new()
     }
 }
