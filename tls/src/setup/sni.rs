@@ -150,7 +150,14 @@ fn register_server_names(
         let lower = name.to_ascii_lowercase();
 
         if let Some(suffix) = lower.strip_prefix("*.") {
-            wildcard_certs.push((format!(".{suffix}"), Arc::clone(certified)));
+            let wildcard_suffix = format!(".{suffix}");
+            if wildcard_certs.iter().any(|(s, _)| s == &wildcard_suffix) {
+                return Err(TlsError::FileLoadError {
+                    path: pair.cert_path.clone(),
+                    detail: format!("duplicate wildcard server_name '*.{suffix}'"),
+                });
+            }
+            wildcard_certs.push((wildcard_suffix, Arc::clone(certified)));
         } else {
             use std::collections::hash_map::Entry;
             match certs.entry(lower) {
@@ -180,7 +187,7 @@ fn register_server_names(
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, reason = "tests")]
 mod tests {
     use super::*;
-    use crate::test_utils::gen_test_certs;
+    use crate::test_utils::{gen_test_certs, gen_test_certs_with_sans};
 
     #[test]
     fn sni_resolver_returns_matching_cert() {
@@ -313,6 +320,54 @@ mod tests {
         let resolver = build_sni_resolver(&certificates).expect("wildcard SNI should build");
         assert_eq!(resolver.hostname_count(), 0, "wildcard should not be in exact map");
         assert_eq!(resolver.wildcard_count(), 1, "wildcard should be in wildcard list");
+    }
+
+    #[test]
+    fn sni_resolver_multi_domain_cert() {
+        let certs = gen_test_certs_with_sans(vec!["api.example.com".to_owned(), "web.example.com".to_owned()]);
+        let certificates = vec![CertKeyPair {
+            cert_path: certs.cert_path.to_str().expect("cert path").to_owned(),
+            default: false,
+            key_path: certs.key_path.to_str().expect("key path").to_owned(),
+            server_names: vec!["api.example.com".to_owned(), "web.example.com".to_owned()],
+        }];
+
+        let resolver = build_sni_resolver(&certificates).expect("multi-domain SNI should build");
+        assert!(
+            resolver.has_hostname("api.example.com"),
+            "should resolve api.example.com"
+        );
+        assert!(
+            resolver.has_hostname("web.example.com"),
+            "should resolve web.example.com"
+        );
+        assert_eq!(resolver.hostname_count(), 2, "should have two SNI entries");
+    }
+
+    #[test]
+    fn sni_resolver_rejects_duplicate_wildcard() {
+        let certs1 = gen_test_certs();
+        let certs2 = gen_test_certs();
+        let certificates = vec![
+            CertKeyPair {
+                cert_path: certs1.cert_path.to_str().expect("cert1 path").to_owned(),
+                default: false,
+                key_path: certs1.key_path.to_str().expect("key1 path").to_owned(),
+                server_names: vec!["*.example.com".to_owned()],
+            },
+            CertKeyPair {
+                cert_path: certs2.cert_path.to_str().expect("cert2 path").to_owned(),
+                default: false,
+                key_path: certs2.key_path.to_str().expect("key2 path").to_owned(),
+                server_names: vec!["*.example.com".to_owned()],
+            },
+        ];
+
+        let err = build_sni_resolver(&certificates).unwrap_err();
+        assert!(
+            err.to_string().contains("duplicate wildcard"),
+            "should reject duplicate wildcard: {err}"
+        );
     }
 
     #[test]

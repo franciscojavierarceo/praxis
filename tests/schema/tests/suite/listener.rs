@@ -29,10 +29,10 @@ filter_chains:
       - filter: static_response
         status: 200
 "#;
-    let config = Config::from_yaml(yaml).unwrap();
-    assert_eq!(
-        config.listeners[0].name, "",
-        "single empty-name listener should be accepted"
+    let err = Config::from_yaml(yaml).unwrap_err();
+    assert!(
+        err.to_string().contains("name must not be empty"),
+        "empty listener name should be rejected: {err}"
     );
 }
 

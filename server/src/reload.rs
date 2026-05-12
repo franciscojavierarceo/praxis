@@ -46,6 +46,11 @@ pub(crate) fn reload_pipelines(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("building new pipelines from reloaded config");
 
+    if let Err(e) = praxis_core::logging::validate_log_overrides(new_config) {
+        error!(error = %e, "config reload failed: invalid log_overrides");
+        return Err(e.into());
+    }
+
     let health_registry = build_health_registry(&new_config.clusters);
 
     let new_pipelines = match resolve_pipelines(new_config, registry, &health_registry, kv_stores) {

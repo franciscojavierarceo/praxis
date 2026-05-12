@@ -1078,7 +1078,7 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 [[package]]
 name = "pingora-core"
 version = "0.8.0"
-source = "git+https://github.com/praxis-proxy/pingora.git?rev=2e452af034fb23a9cd57ec808e7d374037c0d664#2e452af034fb23a9cd57ec808e7d374037c0d664"
+source = "git+https://github.com/praxis-proxy/pingora.git?rev=d066f6818038dc296326566afb8e7bf39fb463ff#d066f6818038dc296326566afb8e7bf39fb463ff"
 dependencies = [
  "ahash",
  "async-trait",
@@ -1131,12 +1131,12 @@ dependencies = [
 [[package]]
 name = "pingora-error"
 version = "0.8.0"
-source = "git+https://github.com/praxis-proxy/pingora.git?rev=2e452af034fb23a9cd57ec808e7d374037c0d664#2e452af034fb23a9cd57ec808e7d374037c0d664"
+source = "git+https://github.com/praxis-proxy/pingora.git?rev=d066f6818038dc296326566afb8e7bf39fb463ff#d066f6818038dc296326566afb8e7bf39fb463ff"
 
 [[package]]
 name = "pingora-http"
 version = "0.8.0"
-source = "git+https://github.com/praxis-proxy/pingora.git?rev=2e452af034fb23a9cd57ec808e7d374037c0d664#2e452af034fb23a9cd57ec808e7d374037c0d664"
+source = "git+https://github.com/praxis-proxy/pingora.git?rev=d066f6818038dc296326566afb8e7bf39fb463ff#d066f6818038dc296326566afb8e7bf39fb463ff"
 dependencies = [
  "bytes",
  "http",
@@ -1146,7 +1146,7 @@ dependencies = [
 [[package]]
 name = "pingora-pool"
 version = "0.8.0"
-source = "git+https://github.com/praxis-proxy/pingora.git?rev=2e452af034fb23a9cd57ec808e7d374037c0d664#2e452af034fb23a9cd57ec808e7d374037c0d664"
+source = "git+https://github.com/praxis-proxy/pingora.git?rev=d066f6818038dc296326566afb8e7bf39fb463ff#d066f6818038dc296326566afb8e7bf39fb463ff"
 dependencies = [
  "crossbeam-queue",
  "log",
@@ -1160,7 +1160,7 @@ dependencies = [
 [[package]]
 name = "pingora-runtime"
 version = "0.8.0"
-source = "git+https://github.com/praxis-proxy/pingora.git?rev=2e452af034fb23a9cd57ec808e7d374037c0d664#2e452af034fb23a9cd57ec808e7d374037c0d664"
+source = "git+https://github.com/praxis-proxy/pingora.git?rev=d066f6818038dc296326566afb8e7bf39fb463ff#d066f6818038dc296326566afb8e7bf39fb463ff"
 dependencies = [
  "once_cell",
  "rand",
@@ -1171,7 +1171,7 @@ dependencies = [
 [[package]]
 name = "pingora-rustls"
 version = "0.8.0"
-source = "git+https://github.com/praxis-proxy/pingora.git?rev=2e452af034fb23a9cd57ec808e7d374037c0d664#2e452af034fb23a9cd57ec808e7d374037c0d664"
+source = "git+https://github.com/praxis-proxy/pingora.git?rev=d066f6818038dc296326566afb8e7bf39fb463ff#d066f6818038dc296326566afb8e7bf39fb463ff"
 dependencies = [
  "log",
  "no_debug",
@@ -1187,7 +1187,7 @@ dependencies = [
 [[package]]
 name = "pingora-timeout"
 version = "0.8.0"
-source = "git+https://github.com/praxis-proxy/pingora.git?rev=2e452af034fb23a9cd57ec808e7d374037c0d664#2e452af034fb23a9cd57ec808e7d374037c0d664"
+source = "git+https://github.com/praxis-proxy/pingora.git?rev=d066f6818038dc296326566afb8e7bf39fb463ff#d066f6818038dc296326566afb8e7bf39fb463ff"
 dependencies = [
  "once_cell",
  "parking_lot",

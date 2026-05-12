@@ -97,6 +97,18 @@ pub(crate) fn gen_ca_file() -> TestCa {
     }
 }
 
+/// Generate a test certificate with custom Subject Alternative Names.
+pub(crate) fn gen_test_certs_with_sans(sans: Vec<String>) -> TestCerts {
+    let temp_dir = tempfile::TempDir::new().expect("tempdir");
+    let certs = gen_certs_with_sans_at(temp_dir.path(), "Test CA", sans);
+    TestCerts {
+        _temp_dir: Some(temp_dir),
+        ca_cert_path: certs.ca_cert_path,
+        cert_path: certs.cert_path,
+        key_path: certs.key_path,
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Shared Implementation
 // -----------------------------------------------------------------------------
@@ -124,6 +136,37 @@ fn gen_certs_at(dir: &std::path::Path, ca_cn: &str) -> GeneratedCerts {
     let server_key = KeyPair::generate().expect("server key generation");
     let mut server_params = CertificateParams::new(vec!["localhost".to_owned()]).expect("server params");
     server_params.distinguished_name.push(DnType::CommonName, "localhost");
+    let server_cert = server_params
+        .signed_by(&server_key, &ca_cert, &ca_key)
+        .expect("server cert sign");
+
+    let cert_path = dir.join("server.pem");
+    let key_path = dir.join("server-key.pem");
+    let ca_cert_path = dir.join("ca.pem");
+
+    std::fs::write(&cert_path, server_cert.pem()).expect("write cert PEM");
+    std::fs::write(&key_path, server_key.serialize_pem()).expect("write key PEM");
+    std::fs::write(&ca_cert_path, ca_cert.pem()).expect("write CA PEM");
+
+    GeneratedCerts {
+        ca_cert_path,
+        cert_path,
+        key_path,
+    }
+}
+
+/// Generate a CA and server cert with custom SANs in `dir`.
+fn gen_certs_with_sans_at(dir: &std::path::Path, ca_cn: &str, sans: Vec<String>) -> GeneratedCerts {
+    let ca_key = KeyPair::generate().expect("CA key generation");
+    let mut ca_params = CertificateParams::new(Vec::<String>::new()).expect("CA params");
+    ca_params.is_ca = IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+    ca_params.distinguished_name.push(DnType::CommonName, ca_cn);
+    let ca_cert = ca_params.self_signed(&ca_key).expect("CA self-sign");
+
+    let cn = sans.first().map_or("localhost", String::as_str).to_owned();
+    let server_key = KeyPair::generate().expect("server key generation");
+    let mut server_params = CertificateParams::new(sans).expect("server params");
+    server_params.distinguished_name.push(DnType::CommonName, cn);
     let server_cert = server_params
         .signed_by(&server_key, &ca_cert, &ca_key)
         .expect("server cert sign");

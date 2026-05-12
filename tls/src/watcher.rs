@@ -119,7 +119,10 @@ async fn watch_loop(
         tokio::select! {
             Some(()) = rx.recv() => {
                 tracing::debug!(debounce_ms = backoff_ms, "filesystem change detected, debouncing");
-                drain_and_debounce(&mut rx, backoff_ms).await;
+                if drain_and_debounce(&mut rx, backoff_ms, &mut shutdown).await {
+                    tracing::info!("certificate file watcher shutting down (during debounce)");
+                    return;
+                }
 
                 if reload_cert(&current, &pair) {
                     backoff_ms = DEBOUNCE_MS;
@@ -167,11 +170,25 @@ fn setup_watcher(tx: mpsc::Sender<()>, cert_dir: &Path, key_dir: &Path) -> Resul
 /// Drain pending events and sleep for the debounce window.
 ///
 /// `delay_ms` increases on consecutive failures (backoff) and
-/// resets on success. Shutdown is not serviced during the sleep,
-/// so graceful shutdown may be delayed up to `delay_ms`.
-async fn drain_and_debounce(rx: &mut mpsc::Receiver<()>, delay_ms: u64) {
-    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+/// resets on success. Returns `true` if shutdown was requested
+/// during the sleep.
+async fn drain_and_debounce(
+    rx: &mut mpsc::Receiver<()>,
+    delay_ms: u64,
+    shutdown: &mut tokio::sync::watch::Receiver<bool>,
+) -> bool {
+    let sleep = tokio::time::sleep(Duration::from_millis(delay_ms));
+    tokio::pin!(sleep);
+    tokio::select! {
+        () = &mut sleep => {},
+        result = shutdown.changed() => {
+            if result.is_ok() && *shutdown.borrow() {
+                return true;
+            }
+        },
+    }
     while rx.try_recv().is_ok() {}
+    false
 }
 
 /// Attempt to reload the certificate, logging success or failure.
