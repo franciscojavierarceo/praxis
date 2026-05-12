@@ -58,14 +58,14 @@ pub(super) struct ClusterCredentialConfig {
     #[serde(default)]
     pub header_prefix: Option<String>,
 
-    /// Whether to strip client-provided values for this
-    /// header before injecting the configured credential.
-    /// Defaults to `true`.
+    /// Deprecated: injection always replaces any client-provided
+    /// value for the header. Retained for config compatibility.
     #[serde(default = "default_strip")]
+    #[allow(dead_code, reason = "parsed by serde for config compatibility")]
     pub strip_client_credential: bool,
 }
 
-/// Default for `strip_client_credential`: always strip.
+/// Default for `strip_client_credential`.
 fn default_strip() -> bool {
     true
 }

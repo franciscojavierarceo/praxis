@@ -25,9 +25,6 @@ struct ClusterCredential {
 
     /// Full header value (prefix + credential).
     header_value: String,
-
-    /// Whether to strip existing client values for this header.
-    strip: bool,
 }
 
 // -----------------------------------------------------------------------------
@@ -151,20 +148,10 @@ impl HttpFilter for CredentialInjectionFilter {
             return Ok(FilterAction::Continue);
         };
 
-        if cred.strip {
-            tracing::debug!(
-                cluster = %cluster,
-                header = %cred.header,
-                "stripping client-provided credential header before injection"
-            );
-        }
-
-        // insert_header replaces all existing values for the key,
-        // so the inject implicitly strips client-provided values.
         tracing::debug!(
             cluster = %cluster,
             header = %cred.header,
-            "injecting credential header"
+            "injecting credential header (replaces any client-provided value)"
         );
         ctx.extra_request_headers
             .push((Cow::Owned(cred.header.clone()), cred.header_value.clone()));
@@ -189,7 +176,6 @@ fn resolve_credential(cfg: &ClusterCredentialConfig) -> Result<ClusterCredential
     Ok(ClusterCredential {
         header: cfg.header.clone(),
         header_value,
-        strip: cfg.strip_client_credential,
     })
 }
 

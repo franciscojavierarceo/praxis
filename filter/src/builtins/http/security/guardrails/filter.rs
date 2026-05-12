@@ -146,9 +146,10 @@ impl GuardrailsFilter {
             let matched = ctx
                 .request
                 .headers
-                .get(header_name.as_str())
-                .and_then(|val| val.to_str().ok())
-                .is_some_and(|s| rule.matches(s));
+                .get_all(header_name.as_str())
+                .iter()
+                .filter_map(|val| val.to_str().ok())
+                .any(|s| rule.matches(s));
 
             let triggered = if rule.negate { !matched } else { matched };
 
@@ -235,8 +236,12 @@ impl HttpFilter for GuardrailsFilter {
             return Ok(FilterAction::Continue);
         };
 
-        let text = String::from_utf8_lossy(chunk);
-        if self.check_body(&text) {
+        let Ok(text) = std::str::from_utf8(chunk) else {
+            tracing::info!("guardrails: rejecting non-UTF-8 body");
+            write_result(ctx, "blocked");
+            return Ok(self.blocked_action());
+        };
+        if self.check_body(text) {
             write_result(ctx, "blocked");
             return Ok(self.blocked_action());
         }

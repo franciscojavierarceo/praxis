@@ -140,7 +140,11 @@ impl ForwardedHeadersFilter {
         let for_param = format_for_param(client_ip);
         let mut entry = format!("for={for_param};proto={proto}");
         if let Some(h) = host {
-            let _ok = write!(entry, ";host={h}");
+            if h.contains(':') {
+                let _ok = write!(entry, ";host=\"{h}\"");
+            } else {
+                let _ok = write!(entry, ";host={h}");
+            }
         }
 
         let value = if self.is_trusted(client_ip)
@@ -492,6 +496,27 @@ trusted_proxies:
         assert!(
             fwd.is_some_and(|v| v.starts_with("for=203.0.113.50;proto=https, for=10.1.2.3")),
             "trusted proxy should append to existing Forwarded: {fwd:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn standard_forwarded_ipv6_host_quoted() {
+        let f = make_standard_filter(&[]);
+        let mut req = crate::test_utils::make_request(http::Method::GET, "/");
+        req.headers.insert(http::header::HOST, "[::1]:8080".parse().unwrap());
+        let mut ctx = crate::test_utils::make_filter_context(&req);
+        ctx.client_addr = Some("203.0.113.50".parse().unwrap());
+
+        drop(f.on_request(&mut ctx).await.unwrap());
+
+        let fwd = ctx
+            .extra_request_headers
+            .iter()
+            .find(|(k, _)| k == "Forwarded")
+            .map(|(_, v)| v.as_str());
+        assert!(
+            fwd.is_some_and(|v| v.contains(";host=\"[::1]:8080\"")),
+            "IPv6 host must be quoted in Forwarded header: {fwd:?}"
         );
     }
 
