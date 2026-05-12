@@ -18,4 +18,7 @@ mod rule;
 )]
 mod tests;
 
-pub use self::{config::GuardrailsAction, filter::GuardrailsFilter};
+pub use self::{
+    config::{GuardrailsAction, RuleTargetKind},
+    filter::GuardrailsFilter,
+};

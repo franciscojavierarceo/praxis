@@ -5,7 +5,7 @@
 
 use regex::{Regex, RegexBuilder};
 
-use super::config::{MAX_REGEX_PATTERN_LEN, MAX_REGEX_SIZE, RuleConfig};
+use super::config::{MAX_REGEX_PATTERN_LEN, MAX_REGEX_SIZE, RuleConfig, RuleTargetKind};
 use crate::FilterError;
 
 // -----------------------------------------------------------------------------
@@ -61,8 +61,8 @@ impl CompiledRule {
 
 /// Parse the target field from a rule config.
 pub(super) fn parse_target(rule: &RuleConfig) -> Result<RuleTarget, FilterError> {
-    match rule.target.as_str() {
-        "header" => {
+    match rule.target {
+        RuleTargetKind::Header => {
             let name = rule
                 .name
                 .as_ref()
@@ -72,8 +72,7 @@ pub(super) fn parse_target(rule: &RuleConfig) -> Result<RuleTarget, FilterError>
             }
             Ok(RuleTarget::Header(name.clone()))
         },
-        "body" => Ok(RuleTarget::Body),
-        other => Err(format!("guardrails: unknown target '{other}', expected 'header' or 'body'").into()),
+        RuleTargetKind::Body => Ok(RuleTarget::Body),
     }
 }
 

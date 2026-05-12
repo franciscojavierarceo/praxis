@@ -12,9 +12,9 @@ mod guardrails;
 mod ip_acl;
 pub(crate) mod origin_normalize;
 
-pub use cors::CorsFilter;
+pub use cors::{CorsFilter, DisallowedOriginMode};
 pub use credential_injection::CredentialInjectionFilter;
 pub use csrf::CsrfFilter;
 pub use forwarded_headers::ForwardedHeadersFilter;
-pub use guardrails::{GuardrailsAction, GuardrailsFilter};
+pub use guardrails::{GuardrailsAction, GuardrailsFilter, RuleTargetKind};
 pub use ip_acl::IpAclFilter;

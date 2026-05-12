@@ -14,11 +14,11 @@ pub use ai::ModelToHeaderFilter;
 pub use observability::{AccessLogFilter, RequestIdFilter};
 pub use payload_processing::{CompressionFilter, JsonBodyFieldFilter, JsonRpcFilter};
 pub use security::{
-    CorsFilter, CredentialInjectionFilter, CsrfFilter, ForwardedHeadersFilter, GuardrailsAction, GuardrailsFilter,
-    IpAclFilter,
+    CorsFilter, CredentialInjectionFilter, CsrfFilter, DisallowedOriginMode, ForwardedHeadersFilter, GuardrailsAction,
+    GuardrailsFilter, IpAclFilter, RuleTargetKind,
 };
 pub use traffic_management::{
-    CircuitBreakerFilter, LoadBalancerFilter, RateLimitFilter, RedirectFilter, RouterFilter, StaticResponseFilter,
-    TimeoutFilter,
+    CircuitBreakerFilter, LoadBalancerFilter, RateLimitFilter, RateLimitMode, RedirectFilter, RedirectStatus,
+    RouterFilter, StaticResponseFilter, TimeoutFilter,
 };
 pub use transformation::{HeaderFilter, PathRewriteFilter, UrlRewriteFilter, normalize_rewritten_path};

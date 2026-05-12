@@ -8,6 +8,8 @@ mod config;
 mod headers;
 mod origin;
 
+pub use self::config::DisallowedOriginMode;
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -162,7 +164,7 @@ impl CorsFilter {
             allow_credentials: cfg.allow_credentials,
             allow_null_origin: cfg.allow_null_origin,
             allow_private_network: cfg.allow_private_network,
-            reject_mode: cfg.disallowed_origin_mode == "reject",
+            reject_mode: cfg.disallowed_origin_mode == DisallowedOriginMode::Reject,
             methods_header: methods.join(", "),
             headers_header: cfg.allow_headers.join(", "),
             expose_header: cfg.expose_headers.join(", "),

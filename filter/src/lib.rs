@@ -25,8 +25,9 @@ pub use actions::{FilterAction, Rejection};
 pub use any_filter::AnyFilter;
 pub use body::{BodyAccess, BodyBuffer, BodyBufferOverflow, BodyCapabilities, BodyMode};
 pub use builtins::{
-    CircuitBreakerFilter, CredentialInjectionFilter, GuardrailsAction, GuardrailsFilter, LoadBalancerFilter,
-    RouterFilter, http::payload_processing::compression_config::CompressionConfig, normalize_rewritten_path,
+    CircuitBreakerFilter, CredentialInjectionFilter, DisallowedOriginMode, GuardrailsAction, GuardrailsFilter,
+    LoadBalancerFilter, RateLimitMode, RedirectStatus, RouterFilter, RuleTargetKind,
+    http::payload_processing::compression_config::CompressionConfig, normalize_rewritten_path,
 };
 pub use condition::{should_execute, should_execute_response, should_execute_response_ref};
 pub use context::{HttpFilterContext, Request, Response};

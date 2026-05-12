@@ -14,8 +14,8 @@ pub(crate) mod token_bucket;
 
 pub use circuit_breaker::CircuitBreakerFilter;
 pub use load_balancer::LoadBalancerFilter;
-pub use rate_limit::RateLimitFilter;
-pub use redirect::RedirectFilter;
+pub use rate_limit::{RateLimitFilter, RateLimitMode};
+pub use redirect::{RedirectFilter, RedirectStatus};
 pub use router::RouterFilter;
 pub use static_response::StaticResponseFilter;
 pub use timeout::TimeoutFilter;
