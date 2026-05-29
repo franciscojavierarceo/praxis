@@ -1,6 +1,6 @@
 ---
 issue: # to be created
-discussion: # to be created
+discussion: https://github.com/praxis-proxy/praxis/pull/420
 status: proposed
 authors:
   - franciscojavierarceo
