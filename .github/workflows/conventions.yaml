@@ -83,7 +83,7 @@ jobs:
           word_count=$(echo "$PR_BODY" | wc -w)
           if [ "$word_count" -lt 2 ]; then # minimum "fixes <issue_number>"
             gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" \
-              --body "Please add a description to this PR explaining what it does and why. See our [coding conventions](docs/conventions.md)."
+              --body "Please add a description to this PR explaining what it does and why. See our [coding conventions](docs/developing/conventions.md)."
           fi
 
   # ----------------------------------------------------------------------------
