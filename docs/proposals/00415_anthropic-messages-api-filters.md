@@ -28,7 +28,7 @@ semantics and is out of scope for format
 transformation. Responses API support is covered
 separately.
 
-The scope covers three capabilities:
+The scope covers five capabilities:
 
 1. **Classification and routing**: detect Anthropic
    Messages API requests by body structure and
@@ -46,7 +46,21 @@ The scope covers three capabilities:
    sufficient. The `anthropic-version` header is the
    strongest signal.
 
-2. **Format transformation**: bidirectional conversion
+2. **Request validation**: validate proxy-needed
+   fields before forwarding, following the same
+   principle as #354's `request_validate`. Checks
+   that `messages` is non-empty, first message has
+   `role: user`, `max_tokens` is present and > 0,
+   `model` is non-empty, and content blocks have
+   valid `type` fields. Unlike the Responses API,
+   Anthropic Messages does not require persistence
+   or stateful orchestration, so the validation
+   filter is lighter — no shared state struct, no
+   store initialization. Let the backend handle
+   parameter ranges, model availability, and
+   inference-specific validation.
+
+3. **Format transformation**: bidirectional conversion
    between Anthropic Messages and OpenAI Chat
    Completions so that clients speaking one dialect
    can reach backends speaking the other. This is
@@ -112,7 +126,15 @@ The scope covers three capabilities:
      `cached_tokens` → `cache_read_input_tokens`
    - Response ID generated as `msg_{uuid}`
 
-   **Streaming (OpenAI chunks → Anthropic SSE):**
+4. **Streaming SSE transformation**: a separate
+   filter (following the `stream_events` pattern in
+   #354) that transforms streaming responses between
+   Anthropic and `OpenAI` SSE formats. Decoupled
+   from request body transformation so operators can
+   use SSE event handling independently (e.g. for
+   logging or guardrails on passthrough streams).
+
+   **Event mapping (`OpenAI` chunks → Anthropic SSE):**
    1. Emit `MessageStartEvent` with empty content
    2. Per text delta: `ContentBlockStartEvent` +
       `ContentBlockDeltaEvent(text_delta)`
@@ -125,7 +147,7 @@ The scope covers three capabilities:
       and usage
    6. `MessageStopEvent`
 
-3. **Anthropic-native features**: proxy and preserve
+5. **Anthropic-native features**: proxy and preserve
    Anthropic-specific capabilities that have no
    OpenAI equivalent when routing to Anthropic
    backends in pass-through mode:
@@ -145,6 +167,11 @@ deploy only what they need.
 
 ### Goals
 
+- Validate proxy-needed fields in Anthropic Messages
+  requests (`messages` non-empty, `max_tokens` > 0,
+  `model` present) and reject malformed requests
+  with consistent error responses before they reach
+  the backend.
 - Classify Anthropic Messages API requests and
   promote `x-praxis-api-format: anthropic_messages`
   to headers for routing, extending the existing
@@ -284,10 +311,6 @@ what can be mapped, and log what was dropped.
   Anthropic backends the same way I manage
   `Authorization: Bearer` headers for OpenAI
   backends.
-- As a platform engineer running llm-d with vLLM
-  workers, I want clients using the Anthropic SDK
-  to transparently reach my vLLM fleet with
-  automatic request/response format translation.
 - As a security engineer, I want Anthropic-specific
   rate-limit headers (`x-ratelimit-limit-tokens`,
   etc.) to be forwarded to clients so that
