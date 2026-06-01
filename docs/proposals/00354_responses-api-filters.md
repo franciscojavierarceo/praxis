@@ -3,6 +3,10 @@ issue: https://github.com/praxis-proxy/praxis/issues/354
 status: proposed
 authors:
   - leseb
+graduation_criteria:
+  - Tier decomposition accepted by stakeholders
+  - State management dependency resolved (see #99)
+  - How? section refinements complete
 stakeholders:
   - shaneutt
   - nerdalert
