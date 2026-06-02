@@ -92,12 +92,13 @@ impl McpFilter {
 
         let cfg: McpConfig = parse_filter_config("mcp", config)?;
         let validated_config = build_config(cfg)?;
-        let json_rpc_config = build_json_rpc_config(validated_config.max_body_bytes);
+        let max_body_bytes = validated_config.max_body_bytes;
+        let json_rpc_config = build_json_rpc_config(max_body_bytes);
 
         Ok(Box::new(Self {
-            max_body_bytes: validated_config.max_body_bytes,
             config: validated_config,
             json_rpc_config,
+            max_body_bytes,
         }))
     }
 }
@@ -181,7 +182,7 @@ impl HttpFilter for McpFilter {
 }
 
 // -----------------------------------------------------------------------------
-// Helpers
+// Private Utilities
 // -----------------------------------------------------------------------------
 
 /// Build a `JsonRpcConfig` for the shared parser with MCP-appropriate defaults.
@@ -189,14 +190,14 @@ fn build_json_rpc_config(max_body_bytes: usize) -> JsonRpcConfig {
     use super::json_rpc::config::{BatchPolicy, InvalidJsonRpcBehavior, JsonRpcHeaders};
 
     JsonRpcConfig {
-        max_body_bytes,
         batch_policy: BatchPolicy::Reject,
-        on_invalid: InvalidJsonRpcBehavior::Continue,
         headers: JsonRpcHeaders {
-            method: None,
             id: None,
             kind: None,
+            method: None,
         },
+        max_body_bytes,
+        on_invalid: InvalidJsonRpcBehavior::Continue,
     }
 }
 
@@ -334,6 +335,11 @@ fn mcp_header_mismatch_rejection(envelope: &super::json_rpc::envelope::JsonRpcEn
 }
 
 /// MCP rejections preserve JSON-RPC IDs so clients can correlate errors.
+///
+/// Returns HTTP 200 per the JSON-RPC over HTTP spec: application-level
+/// errors are conveyed inside the JSON-RPC error object, not via HTTP
+/// status codes. Only transport-level failures (malformed HTTP, non-JSON
+/// bodies) use HTTP 4xx.
 fn mcp_json_rpc_error_rejection(
     envelope: &super::json_rpc::envelope::JsonRpcEnvelope,
     code: i32,
@@ -346,11 +352,12 @@ fn mcp_json_rpc_error_rejection(
         (Some(id), JsonRpcIdKind::String) => serde_json::to_string(id).unwrap_or_else(|_| "null".to_owned()),
         _ => "null".to_owned(),
     };
+    let message_json = serde_json::to_string(message).unwrap_or_else(|_| "\"internal error\"".to_owned());
     let body = Bytes::from(format!(
-        r#"{{"jsonrpc":"2.0","error":{{"code":{code},"message":"{message}"}},"id":{id_json}}}"#,
+        r#"{{"jsonrpc":"2.0","error":{{"code":{code},"message":{message_json}}},"id":{id_json}}}"#,
     ));
     FilterAction::Reject(
-        Rejection::status(400)
+        Rejection::status(200)
             .with_header("content-type", "application/json")
             .with_body(body),
     )

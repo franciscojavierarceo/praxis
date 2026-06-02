@@ -4,6 +4,10 @@ discussion: https://github.com/praxis-proxy/praxis/discussions/87
 status: proposed
 authors:
   - usize
+graduation_criteria:
+  - How? section with requirements and design
+  - HTTP client pool and lifecycle design
+  - SSRF prevention model validated
 stakeholders:
   - shaneutt
   - twghu
