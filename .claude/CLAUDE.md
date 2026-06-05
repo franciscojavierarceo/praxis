@@ -220,40 +220,39 @@ Branches rejoin at configurable points (next,
 terminal, named filter, re-entrance with iteration
 limits).
 
+## Terminology: Routing vs Pipelining
+
+These two concepts are distinct. Do not conflate them.
+
+- **Routing** (runtime): the `router` filter selects
+  an upstream cluster at request time based on path,
+  host, and headers. This decides *where* a request
+  goes.
+- **Pipelining** (config-time): the operator composes
+  named filter chains per listener; chains are
+  resolved and concatenated into a single
+  `FilterPipeline` at startup. This decides *what
+  processing* a request receives. Branch chains add
+  conditional paths within a pipeline.
+
 ## Key Patterns
 
-- **Classify → route**: classifier filters promote
-  facts to internal headers (`x-praxis-ai-*`) and
-  the router matches those headers to select
-  clusters. See
+- **Classify → route → branch**: classifier filters
+  promote facts to headers (`x-praxis-ai-format`),
+  the router matches headers to select clusters
+  (routing), branch chains split pipelines
+  (pipelining). See
   `examples/configs/ai/openai/responses/format-routing.yaml`.
-- **Branch on filter results**: branch chains split
-  or rejoin request-phase pipelines based on filter
-  results (`on_result`). See
-  `examples/configs/pipeline/branch-chains.yaml`
-  and `tests/integration/tests/suite/responses_format.rs`.
-  Branch sub-chains only run `on_request`;
-  `on_request_body` and `on_response_body` are not
-  executed for filters inside branch chains.
-  Body-transforming filters must be in the main
-  pipeline path or gated with normal filter
-  conditions.
-- **Prefer existing routing mechanisms**: use
-  classifier-promoted headers, router matches,
-  filter conditions, and branch chains before
-  adding new routing or capability mechanisms.
-- **Do not buffer full streaming responses**:
-  streaming and SSE filters should use
-  `BodyMode::Stream` and process chunks
-  incrementally unless the feature explicitly
-  requires buffering.
+  Do not invent new routing mechanisms.
+- **No full-response buffering for SSE**: use
+  `BodyMode::Stream` and process per-chunk. See
+  Inference Proxy Conformance Guidelines §4.3.
 - **Validate only proxy-needed fields**: let the
   backend handle parameter ranges, model
   availability, and role ordering.
-- **Use dedicated rewrite filters for URL/path
-  translation**: use `path_rewrite` or `url_rewrite`;
-  provider and protocol filters should not set
-  `ctx.rewritten_path` directly.
+- **Use `path_rewrite` filter for URL translation**:
+  do not set `ctx.rewritten_path` from inside
+  filters.
 
 ## Filter Organization
 
