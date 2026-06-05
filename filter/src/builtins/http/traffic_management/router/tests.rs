@@ -693,7 +693,8 @@ fn update_best_match_keeps_current_when_dominated() {
 fn should_stop_early_true_when_prefix_shorter_than_best() {
     let best_route = prefix_route("/api/v2/", "best");
     let shorter = prefix_route("/api/", "shorter");
-    let best = Some(((false, best_route.path_match.len(), 0), &best_route));
+    let best_specificity = crate::path_match::path_prefix_specificity("/api/v2/");
+    let best = Some(((false, best_specificity, 0), &best_route));
     assert!(
         should_stop_early(best, &shorter),
         "should stop when current route prefix is shorter than best"
@@ -704,7 +705,8 @@ fn should_stop_early_true_when_prefix_shorter_than_best() {
 fn should_stop_early_false_when_prefix_equal_to_best() {
     let best_route = prefix_route("/api/", "best");
     let same = prefix_route("/api/", "same");
-    let best = Some(((false, best_route.path_match.len(), 0), &best_route));
+    let best_specificity = crate::path_match::path_prefix_specificity("/api/");
+    let best = Some(((false, best_specificity, 0), &best_route));
     assert!(
         !should_stop_early(best, &same),
         "should not stop when prefix lengths are equal"
