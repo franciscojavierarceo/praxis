@@ -225,7 +225,7 @@ limits).
 
 ## Terminology: Routing vs Pipelining
 
-These two concepts are distinct. Do not conflate them.
+These two concepts are distinct, take care to not conflate them.
 
 - **Routing** (runtime): the `router` filter selects
   an upstream cluster at request time based on path,
