@@ -125,12 +125,12 @@ flowchart LR
     subgraph "Listener: public"
         direction LR
         S["security chain"] --> O["observability chain"]
-        O --> R["routing chain"]
+        O --> R["traffic chain"]
     end
 
     subgraph "Listener: internal"
         direction LR
-        O2["observability chain"] --> R2["routing chain"]
+        O2["observability chain"] --> R2["traffic chain"]
     end
 ```
 

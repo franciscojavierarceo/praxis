@@ -41,7 +41,7 @@ and the [extensions guide](../filters/extensions.md).
 ## Router
 
 Selects a cluster by matching path prefix, host, and
-headers — it sets `ctx.cluster` but does not pick an
+headers. It sets `ctx.cluster` but does not pick an
 endpoint or forward the request. The `load_balancer`
 filter (below) reads `ctx.cluster` to select an endpoint
 and set `ctx.upstream`. Together: the router decides
@@ -64,8 +64,8 @@ Example configs: [path-based-routing.yaml],
 
 Reads `ctx.cluster` (set by the `router` filter) and
 selects a specific endpoint within that cluster, writing
-`ctx.upstream`. This is where the request is actually
-dispatched.
+`ctx.upstream`. The protocol adapter layer then forwards
+the request to the selected endpoint.
 
 Strategies:
 
