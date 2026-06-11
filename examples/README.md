@@ -133,6 +133,9 @@ page.
 | [format-routing.yaml](configs/ai/openai/responses/format-routing.yaml) | Route by AI API format (Responses vs Chat Completions) |
 | [responses-routing.yaml](configs/ai/openai/responses/responses-routing.yaml) | Route Responses API by mode (stateless vs stateful) |
 | [request-validate.yaml](configs/ai/openai/responses/request-validate.yaml) | Validate Responses API requests and reject invalid parameter combinations |
+| [messages-passthrough.yaml](configs/ai/anthropic/messages-passthrough.yaml) | Anthropic Messages passthrough to native `/v1/messages` backend |
+| [messages-to-openai.yaml](configs/ai/anthropic/messages-to-openai.yaml) | Transform Anthropic Messages to OpenAI Chat Completions |
+| [unified-gateway.yaml](configs/ai/anthropic/unified-gateway.yaml) | Unified gateway routing Anthropic, OpenAI, and Responses traffic |
 | [response-store.yaml](configs/ai/openai/responses/response-store.yaml) | Persist non-streaming Responses API responses to SQLite |
 
 ### Branching

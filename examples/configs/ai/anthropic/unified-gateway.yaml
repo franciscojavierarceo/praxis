@@ -1,0 +1,53 @@
+# Unified AI Gateway
+#
+# Routes traffic by detected API format:
+# - Anthropic Messages → anthropic-backend (passthrough)
+# - OpenAI Chat Completions → openai-backend (direct)
+# - OpenAI Responses → responses-backend (direct)
+#
+# The `anthropic_messages_format` filter classifies requests and
+# promotes `x-praxis-ai-format` for router-based cluster selection.
+
+listeners:
+  - name: unified-gateway
+    address: "127.0.0.1:8080"
+    filter_chains: [unified-routing]
+
+filter_chains:
+  - name: unified-routing
+    filters:
+      - filter: anthropic_messages_format
+        on_invalid: continue
+        headers:
+          format: x-praxis-ai-format
+          model: x-praxis-ai-model
+          stream: x-praxis-ai-stream
+
+      - filter: openai_responses_format
+        on_invalid: continue
+
+      - filter: router
+        routes:
+          - path: "/v1/messages"
+            cluster: "anthropic-backend"
+          - path: "/v1/chat/completions"
+            cluster: "openai-backend"
+          - path: "/v1/responses"
+            cluster: "responses-backend"
+          - path_prefix: "/"
+            cluster: "default-backend"
+
+      - filter: load_balancer
+        clusters:
+          - name: "anthropic-backend"
+            endpoints:
+              - "127.0.0.1:3001"
+          - name: "openai-backend"
+            endpoints:
+              - "127.0.0.1:3002"
+          - name: "responses-backend"
+            endpoints:
+              - "127.0.0.1:3003"
+          - name: "default-backend"
+            endpoints:
+              - "127.0.0.1:3004"

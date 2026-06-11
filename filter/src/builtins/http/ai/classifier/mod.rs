@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Praxis Contributors
 
-//! Pure request body classifier for Responses API versus Chat Completions.
+//! Pure request body classifier for AI API format detection.
+//!
+//! Disambiguates Responses API, Anthropic Messages, and Chat
+//! Completions from a single JSON body parse.
 
 // -----------------------------------------------------------------------------
 // AiRequestFormat
@@ -12,7 +15,9 @@
 pub(crate) enum AiRequestFormat {
     /// `OpenAI` Responses API (has `input` field).
     Responses,
-    /// Chat Completions API (has `messages` field).
+    /// Anthropic Messages API (`messages` + required `max_tokens`).
+    AnthropicMessages,
+    /// Chat Completions API (has `messages` without required `max_tokens`).
     ChatCompletions,
     /// Valid JSON but neither recognized format.
     UnknownJson,
@@ -27,6 +32,7 @@ impl AiRequestFormat {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Responses => "openai_responses",
+            Self::AnthropicMessages => "anthropic_messages",
             Self::ChatCompletions => "openai_chat_completions",
             Self::UnknownJson => "unknown",
             Self::InvalidJson => "invalid_json",
@@ -55,6 +61,8 @@ pub(crate) struct ClassifiedRequest {
     pub has_prompt_id: bool,
     /// Whether `tools` is a non-empty array.
     pub has_tools: bool,
+    /// Extracted `max_tokens` field value, if present.
+    pub max_tokens: Option<u64>,
     /// Extracted `model` field value, if present.
     pub model: Option<String>,
     /// Extracted `store` field value, if present.
@@ -134,24 +142,62 @@ pub(crate) fn classify_request_body(body: &[u8]) -> ClassifiedRequest {
         has_tools: obj
             .get("tools")
             .is_some_and(|v| v.as_array().is_some_and(|a| !a.is_empty())),
+        max_tokens: obj.get("max_tokens").and_then(serde_json::Value::as_u64),
         model: extract_string(obj, "model"),
         store: obj.get("store").and_then(serde_json::Value::as_bool),
         stream: obj.get("stream").and_then(serde_json::Value::as_bool),
     }
 }
 
-/// Determine format from top-level keys. When both `input` and
-/// `messages` are present, `input` takes precedence (Responses API).
-/// A `prompt` object also indicates a Responses API request (prompt
-/// template usage per `OpenAI` Prompts guide).
+/// Determine format from top-level keys.
+///
+/// Precedence: `input` or `prompt` object → Responses, then
+/// `messages` with Anthropic signals → Anthropic Messages, then
+/// `messages` alone → Chat Completions.
+///
+/// Anthropic signals: `max_tokens` is required AND at least one of
+/// top-level `system` field or typed content blocks (arrays of
+/// objects with a `type` key in `messages`). This prevents false
+/// positives when `OpenAI` Chat Completions requests include the
+/// optional `max_tokens` field.
 fn classify_format(obj: &serde_json::Map<String, serde_json::Value>) -> AiRequestFormat {
     if obj.contains_key("input") || obj.get("prompt").is_some_and(serde_json::Value::is_object) {
-        AiRequestFormat::Responses
-    } else if obj.contains_key("messages") {
-        AiRequestFormat::ChatCompletions
-    } else {
-        AiRequestFormat::UnknownJson
+        return AiRequestFormat::Responses;
     }
+
+    if obj.contains_key("messages") {
+        if obj.contains_key("max_tokens") && has_anthropic_signals(obj) {
+            return AiRequestFormat::AnthropicMessages;
+        }
+        return AiRequestFormat::ChatCompletions;
+    }
+
+    AiRequestFormat::UnknownJson
+}
+
+/// Check for Anthropic-specific structural signals beyond `max_tokens`.
+///
+/// Returns true if any of:
+/// - Top-level `system` field is present (Anthropic separates system from messages; `OpenAI` puts it in the messages
+///   array)
+/// - Any message in `messages` has typed content blocks (array of objects with a `type` key, e.g. `[{"type": "text",
+///   ...}]`)
+fn has_anthropic_signals(obj: &serde_json::Map<String, serde_json::Value>) -> bool {
+    if obj.contains_key("system") {
+        return true;
+    }
+
+    if let Some(serde_json::Value::Array(messages)) = obj.get("messages") {
+        for msg in messages {
+            if let Some(serde_json::Value::Array(blocks)) = msg.get("content")
+                && blocks.iter().any(|b| b.get("type").is_some())
+            {
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 // -----------------------------------------------------------------------------
@@ -167,6 +213,7 @@ pub(crate) fn empty_result(format: AiRequestFormat) -> ClassifiedRequest {
         has_previous_response_id: false,
         has_prompt_id: false,
         has_tools: false,
+        max_tokens: None,
         model: None,
         store: None,
         stream: None,
@@ -271,14 +318,14 @@ mod tests {
     }
 
     #[test]
-    fn chat_completions_messages() {
+    fn chat_completions_messages_without_max_tokens() {
         let body = br#"{"model":"gpt-4","messages":[{"role":"user","content":"Hi"}]}"#;
         let result = classify_request_body(body);
 
         assert_eq!(
             result.format,
             AiRequestFormat::ChatCompletions,
-            "messages array should classify as openai_chat_completions"
+            "messages without max_tokens should classify as chat_completions"
         );
         assert_eq!(result.model.as_deref(), Some("gpt-4"), "model should be extracted");
     }
@@ -291,9 +338,64 @@ mod tests {
         assert_eq!(
             result.format,
             AiRequestFormat::ChatCompletions,
-            "should be openai_chat_completions"
+            "should be chat_completions"
         );
         assert_eq!(result.stream, Some(true), "stream should be extracted");
+    }
+
+    #[test]
+    fn anthropic_messages_with_system() {
+        let body = br#"{"model":"claude-opus-4-8","max_tokens":1024,"system":"Be helpful.","messages":[{"role":"user","content":"Hi"}]}"#;
+        let result = classify_request_body(body);
+
+        assert_eq!(
+            result.format,
+            AiRequestFormat::AnthropicMessages,
+            "messages + max_tokens + system should classify as anthropic_messages"
+        );
+        assert_eq!(
+            result.model.as_deref(),
+            Some("claude-opus-4-8"),
+            "model should be extracted"
+        );
+        assert_eq!(result.max_tokens, Some(1024), "max_tokens should be extracted");
+    }
+
+    #[test]
+    fn anthropic_messages_with_typed_content_blocks() {
+        let body = br#"{"model":"claude-opus-4-8","max_tokens":512,"messages":[{"role":"user","content":[{"type":"text","text":"Hi"}]}],"stream":true}"#;
+        let result = classify_request_body(body);
+
+        assert_eq!(
+            result.format,
+            AiRequestFormat::AnthropicMessages,
+            "typed content blocks should classify as anthropic_messages"
+        );
+        assert_eq!(result.stream, Some(true), "stream should be extracted");
+    }
+
+    #[test]
+    fn chat_completions_with_max_tokens_not_misclassified() {
+        let body = br#"{"model":"gpt-4","messages":[{"role":"user","content":"Hi"}],"max_tokens":100}"#;
+        let result = classify_request_body(body);
+
+        assert_eq!(
+            result.format,
+            AiRequestFormat::ChatCompletions,
+            "messages + max_tokens without Anthropic signals should be chat_completions"
+        );
+    }
+
+    #[test]
+    fn anthropic_messages_max_tokens_without_signals_is_chat() {
+        let body = br#"{"model":"claude-opus-4-8","max_tokens":1024,"messages":[{"role":"user","content":"Hi"}]}"#;
+        let result = classify_request_body(body);
+
+        assert_eq!(
+            result.format,
+            AiRequestFormat::ChatCompletions,
+            "max_tokens + string content + no system should be chat_completions — header override disambiguates in the filter layer"
+        );
     }
 
     #[test]

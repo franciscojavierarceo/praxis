@@ -1,0 +1,42 @@
+# Anthropic Messages to OpenAI Transformation
+#
+# Transforms Anthropic Messages API requests to OpenAI Chat
+# Completions format for backends that only speak OpenAI
+# (e.g. llm-d with disaggregation, KServe without Anthropic).
+#
+# Request: system hoisting, content block flattening, tool mapping.
+# Response: content blocks, stop_reason, usage mapping back to
+# Anthropic format.
+
+listeners:
+  - name: anthropic-gateway
+    address: "127.0.0.1:8080"
+    filter_chains: [anthropic-transform]
+
+filter_chains:
+  - name: anthropic-transform
+    filters:
+      - filter: anthropic_messages_format
+        on_invalid: continue
+
+      - filter: anthropic_to_openai
+        max_body_bytes: 1048576
+
+      - filter: path_rewrite
+        replace:
+          pattern: "^/v1/messages$"
+          replacement: "/v1/chat/completions"
+        conditions:
+          - when:
+              path_prefix: "/v1/messages"
+
+      - filter: router
+        routes:
+          - path_prefix: "/"
+            cluster: "openai-backend"
+
+      - filter: load_balancer
+        clusters:
+          - name: "openai-backend"
+            endpoints:
+              - "127.0.0.1:3001"

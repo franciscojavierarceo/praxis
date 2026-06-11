@@ -146,6 +146,36 @@ fn register_http_builtins(factories: &mut HashMap<String, FilterFactory>) {
     #[cfg(feature = "ai-inference")]
     register_http(
         factories,
+        "anthropic_messages_format",
+        crate::builtins::AnthropicMessagesFormatFilter::from_config,
+    );
+    #[cfg(feature = "ai-inference")]
+    register_http(
+        factories,
+        "anthropic_passthrough",
+        crate::builtins::AnthropicPassthroughFilter::from_config,
+    );
+    #[cfg(feature = "ai-inference")]
+    register_http(
+        factories,
+        "anthropic_validate",
+        crate::builtins::AnthropicValidateFilter::from_config,
+    );
+    #[cfg(feature = "ai-inference")]
+    register_http(
+        factories,
+        "anthropic_stream_events",
+        crate::builtins::AnthropicStreamEventsFilter::from_config,
+    );
+    #[cfg(feature = "ai-inference")]
+    register_http(
+        factories,
+        "anthropic_to_openai",
+        crate::builtins::AnthropicToOpenaiFilter::from_config,
+    );
+    #[cfg(feature = "ai-inference")]
+    register_http(
+        factories,
         "model_to_header",
         crate::builtins::ModelToHeaderFilter::from_config,
     );
@@ -288,6 +318,31 @@ mod tests {
         );
         #[cfg(feature = "ai-inference")]
         assert!(names.contains(&"prompt_enrich"), "prompt_enrich should be registered");
+        #[cfg(feature = "ai-inference")]
+        assert!(
+            names.contains(&"anthropic_messages_format"),
+            "anthropic_messages_format should be registered"
+        );
+        #[cfg(feature = "ai-inference")]
+        assert!(
+            names.contains(&"anthropic_passthrough"),
+            "anthropic_passthrough should be registered"
+        );
+        #[cfg(feature = "ai-inference")]
+        assert!(
+            names.contains(&"anthropic_validate"),
+            "anthropic_validate should be registered"
+        );
+        #[cfg(feature = "ai-inference")]
+        assert!(
+            names.contains(&"anthropic_stream_events"),
+            "anthropic_stream_events should be registered"
+        );
+        #[cfg(feature = "ai-inference")]
+        assert!(
+            names.contains(&"anthropic_to_openai"),
+            "anthropic_to_openai should be registered"
+        );
         #[cfg(feature = "ai-inference")]
         assert!(
             names.contains(&"openai_responses_format"),
