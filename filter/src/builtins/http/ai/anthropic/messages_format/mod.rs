@@ -134,7 +134,7 @@ impl HttpFilter for AnthropicMessagesFormatFilter {
         let mut classified = classify_request_body(bytes);
 
         let has_anthropic_header = ctx.request.headers.get(ANTHROPIC_VERSION_HEADER).is_some();
-        let is_messages_path = ctx.request.uri.path() == "/v1/messages";
+        let is_messages_path = is_anthropic_messages_path(ctx.request.uri.path());
 
         if classified.format == AiRequestFormat::ChatCompletions && (has_anthropic_header || is_messages_path) {
             classified.format = AiRequestFormat::AnthropicMessages;
@@ -238,6 +238,13 @@ fn promote_headers(
     }
 }
 
+/// Check whether the path is the Anthropic Messages endpoint,
+/// normalizing a trailing slash.
+fn is_anthropic_messages_path(path: &str) -> bool {
+    let normalized = path.strip_suffix('/').unwrap_or(path);
+    normalized == "/v1/messages"
+}
+
 /// Promote classification facts to filter results for branch conditions.
 fn promote_filter_results(ctx: &mut HttpFilterContext<'_>, classified: &ClassifiedRequest) -> Result<(), FilterError> {
     let results = ctx.filter_results.entry("anthropic_messages_format").or_default();
@@ -253,6 +260,10 @@ fn promote_filter_results(ctx: &mut HttpFilterContext<'_>, classified: &Classifi
 
     if let Some(stream) = classified.stream {
         results.set("stream", if stream { "true" } else { "false" })?;
+    }
+
+    if let Some(max_tokens) = classified.max_tokens {
+        results.set("max_tokens", max_tokens.to_string())?;
     }
 
     Ok(())

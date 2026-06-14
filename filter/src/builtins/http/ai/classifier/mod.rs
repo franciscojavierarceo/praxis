@@ -178,8 +178,8 @@ fn classify_format(obj: &serde_json::Map<String, serde_json::Value>) -> AiReques
 /// Check for Anthropic-specific structural signals beyond `max_tokens`.
 ///
 /// Returns true if any of:
-/// - Top-level `system` field is present (Anthropic separates system from messages; `OpenAI` puts it in the messages
-///   array)
+/// - Top-level `system` field is present as a string or array (Anthropic separates system from messages; `OpenAI` puts
+///   it in the messages array)
 /// - Any message in `messages` has typed content blocks (array of objects with a `type` key, e.g. `[{"type": "text",
 ///   ...}]`)
 fn has_anthropic_signals(obj: &serde_json::Map<String, serde_json::Value>) -> bool {

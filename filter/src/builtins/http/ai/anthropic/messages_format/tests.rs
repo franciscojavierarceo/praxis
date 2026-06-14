@@ -86,6 +86,41 @@ fn invalid_json_rejected_in_reject_mode() {
     assert!(result.is_some(), "invalid JSON should be rejected in reject mode");
 }
 
+#[test]
+fn non_json_rejected_in_reject_mode() {
+    let cfg: AnthropicMessagesFormatConfig = serde_yaml::from_str("on_invalid: reject").unwrap();
+    let result = handle_invalid_format(AiRequestFormat::NonJson, &cfg);
+    assert!(result.is_some(), "non-JSON body should be rejected in reject mode");
+}
+
+#[test]
+fn unknown_json_rejected_in_reject_mode() {
+    let cfg: AnthropicMessagesFormatConfig = serde_yaml::from_str("on_invalid: reject").unwrap();
+    let result = handle_invalid_format(AiRequestFormat::UnknownJson, &cfg);
+    assert!(result.is_some(), "unknown JSON should be rejected in reject mode");
+}
+
+#[test]
+fn invalid_json_continues_in_continue_mode() {
+    let cfg: AnthropicMessagesFormatConfig = serde_yaml::from_str("on_invalid: continue").unwrap();
+    let result = handle_invalid_format(AiRequestFormat::InvalidJson, &cfg);
+    assert!(result.is_none(), "invalid JSON should pass in continue mode");
+}
+
+#[test]
+fn non_json_continues_in_continue_mode() {
+    let cfg: AnthropicMessagesFormatConfig = serde_yaml::from_str("on_invalid: continue").unwrap();
+    let result = handle_invalid_format(AiRequestFormat::NonJson, &cfg);
+    assert!(result.is_none(), "non-JSON body should pass in continue mode");
+}
+
+#[test]
+fn unknown_json_continues_in_continue_mode() {
+    let cfg: AnthropicMessagesFormatConfig = serde_yaml::from_str("on_invalid: continue").unwrap();
+    let result = handle_invalid_format(AiRequestFormat::UnknownJson, &cfg);
+    assert!(result.is_none(), "unknown JSON should pass in continue mode");
+}
+
 // -----------------------------------------------------------------------------
 // Promotion Tests
 // -----------------------------------------------------------------------------
@@ -201,6 +236,102 @@ async fn minimal_messages_path_overrides_to_anthropic() {
         headers.get("x-praxis-ai-format"),
         Some(&"anthropic_messages"),
         "minimal body on /v1/messages path should classify as anthropic_messages"
+    );
+}
+
+#[tokio::test]
+async fn body_only_anthropic_classification_without_path_boost() {
+    let filter = make_filter("{}");
+    let mut req = crate::test_utils::make_request(http::Method::POST, "/v1/some-other-path");
+    req.headers.insert("anthropic-version", "2023-06-01".parse().unwrap());
+
+    let req: &'static crate::context::Request = Box::leak(Box::new(req));
+    let mut ctx = crate::test_utils::make_filter_context(req);
+    let mut body = Some(Bytes::from(
+        r#"{"model":"claude-opus-4-8","max_tokens":1024,"system":"You are helpful.","messages":[{"role":"user","content":"Hi"}]}"#,
+    ));
+
+    let action = filter.on_request_body(&mut ctx, &mut body, true).await.unwrap();
+    assert!(matches!(action, FilterAction::Release), "filter should release");
+
+    let headers = collect_headers(&ctx);
+    assert_eq!(
+        headers.get("x-praxis-ai-format"),
+        Some(&"anthropic_messages"),
+        "anthropic-version header should classify as anthropic_messages without /v1/messages path"
+    );
+}
+
+#[tokio::test]
+async fn trailing_slash_messages_path_classifies_as_anthropic() {
+    let filter = make_filter("{}");
+    let req = crate::test_utils::make_request(http::Method::POST, "/v1/messages/");
+
+    let req: &'static crate::context::Request = Box::leak(Box::new(req));
+    let mut ctx = crate::test_utils::make_filter_context(req);
+    let mut body = Some(Bytes::from(
+        r#"{"model":"claude-opus-4-8","max_tokens":1024,"messages":[{"role":"user","content":"Hi"}]}"#,
+    ));
+
+    let action = filter.on_request_body(&mut ctx, &mut body, true).await.unwrap();
+    assert!(matches!(action, FilterAction::Release), "filter should release");
+
+    let headers = collect_headers(&ctx);
+    assert_eq!(
+        headers.get("x-praxis-ai-format"),
+        Some(&"anthropic_messages"),
+        "/v1/messages/ with trailing slash should classify as anthropic_messages"
+    );
+}
+
+#[tokio::test]
+async fn stream_false_promoted_to_metadata_and_header() {
+    let ctx = run_filter(
+        "{}",
+        r#"{"model":"claude-opus-4-8","max_tokens":1024,"system":"Hi","messages":[{"role":"user","content":"Hi"}],"stream":false}"#,
+    )
+    .await;
+
+    assert_eq!(
+        ctx.filter_metadata.get("anthropic_format.stream").map(String::as_str),
+        Some("false"),
+        "stream:false should be promoted to metadata"
+    );
+
+    let headers = collect_headers(&ctx);
+    assert_eq!(
+        headers.get("x-praxis-ai-stream"),
+        Some(&"false"),
+        "stream:false should be promoted to header"
+    );
+}
+
+#[tokio::test]
+async fn null_header_config_suppresses_headers() {
+    let ctx = run_filter(
+        "headers:\n  format: null\n  model: null\n  stream: null",
+        r#"{"model":"claude-opus-4-8","max_tokens":1024,"system":"Hi","messages":[{"role":"user","content":"Hi"}],"stream":true}"#,
+    )
+    .await;
+
+    let headers = collect_headers(&ctx);
+    assert!(
+        !headers.contains_key("x-praxis-ai-format"),
+        "null format header config should suppress format header"
+    );
+    assert!(
+        !headers.contains_key("x-praxis-ai-model"),
+        "null model header config should suppress model header"
+    );
+    assert!(
+        !headers.contains_key("x-praxis-ai-stream"),
+        "null stream header config should suppress stream header"
+    );
+
+    assert_eq!(
+        ctx.filter_metadata.get("anthropic_format.format").map(String::as_str),
+        Some("anthropic_messages"),
+        "metadata should still be written even with null header config"
     );
 }
 
