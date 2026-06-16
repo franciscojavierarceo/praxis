@@ -207,11 +207,34 @@ fn wait_for_postgres(engine: &str, container_id: &str) {
 
 /// Repeatedly call `check` until it returns `true` or the deadline passes.
 fn poll_until(deadline: Instant, check: impl Fn() -> bool) {
-    while Instant::now() < deadline {
+    loop {
         if check() {
             return;
+        }
+        if Instant::now() >= deadline {
+            break;
         }
         thread::sleep(READY_POLL_INTERVAL);
     }
     panic!("`PostgreSQL` container did not become ready within {READY_TIMEOUT:?}");
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use super::*;
+
+    #[test]
+    fn poll_until_checks_readiness_after_sleep_crosses_deadline() {
+        let attempts = Cell::new(0);
+
+        poll_until(Instant::now() + Duration::from_millis(1), || {
+            let next_attempt = attempts.get() + 1;
+            attempts.set(next_attempt);
+            next_attempt == 2
+        });
+
+        assert_eq!(attempts.get(), 2);
+    }
 }
