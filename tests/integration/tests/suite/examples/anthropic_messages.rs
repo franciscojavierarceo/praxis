@@ -35,7 +35,7 @@ fn anthropic_validate_forwards_valid_request() {
 }
 
 #[test]
-fn anthropic_validate_rejects_missing_max_tokens() {
+fn anthropic_validate_forwards_backend_owned_semantics() {
     let backend_guard = start_backend_with_shutdown("ok");
     let proxy_port = free_port();
 
@@ -48,9 +48,31 @@ fn anthropic_validate_rejects_missing_max_tokens() {
 
     let body = r#"{"model":"claude-opus-4-8","messages":[{"role":"user","content":"Hello"}]}"#;
     let raw = http_send(proxy.addr(), &json_post("/v1/messages", body));
+
+    assert_eq!(
+        parse_status(&raw),
+        200,
+        "backend-owned Anthropic semantics should be forwarded"
+    );
+    assert_eq!(parse_body(&raw), "ok", "request should reach the backend");
+}
+
+#[test]
+fn anthropic_validate_rejects_malformed_json() {
+    let backend_guard = start_backend_with_shutdown("ok");
+    let proxy_port = free_port();
+
+    let config = load_example_config(
+        "ai/anthropic/request-validate.yaml",
+        proxy_port,
+        HashMap::from([("127.0.0.1:3001", backend_guard.port())]),
+    );
+    let proxy = start_proxy(&config);
+
+    let raw = http_send(proxy.addr(), &json_post("/v1/messages", "not json {{{"));
     let parsed: serde_json::Value = serde_json::from_str(&parse_body(&raw)).expect("error body should be JSON");
 
-    assert_eq!(parse_status(&raw), 400, "missing max_tokens should be rejected");
+    assert_eq!(parse_status(&raw), 400, "malformed JSON should be rejected");
     assert_eq!(
         parsed["error"]["type"].as_str(),
         Some("invalid_request_error"),

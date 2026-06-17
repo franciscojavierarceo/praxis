@@ -1,8 +1,8 @@
-# Validates Anthropic Messages requests before forwarding
+# Validates Anthropic Messages JSON envelopes before forwarding
 #
-# Validates proxy-needed Anthropic Messages fields before forwarding:
-# `model`, `max_tokens`, and non-empty `messages`.
-# Invalid requests are rejected at the proxy with a 400 response.
+# Rejects empty, malformed, or non-object JSON request bodies.
+# Anthropic API semantics such as required fields and parameter
+# ranges are left to the inference backend.
 
 listeners:
   - name: anthropic-gateway
@@ -12,6 +12,8 @@ listeners:
 filter_chains:
   - name: anthropic-validate
     filters:
+      # anthropic_messages_format wraps the shared AI classifier and applies
+      # /v1/messages plus anthropic-version disambiguation before validation.
       - filter: anthropic_messages_format
         on_invalid: reject
 

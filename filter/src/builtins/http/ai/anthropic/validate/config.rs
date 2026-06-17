@@ -11,7 +11,12 @@ use crate::{FilterError, body::limits::MAX_JSON_BODY_BYTES};
 // Constants
 // -----------------------------------------------------------------------------
 
-/// Default maximum request body size (1 MiB).
+/// Default maximum request body size for validation buffering.
+///
+/// Validation only needs the top-level JSON envelope, so the
+/// default stays below the shared JSON inspection ceiling. Users
+/// can raise it up to [`MAX_JSON_BODY_BYTES`] when they need to
+/// accept larger Anthropic request bodies.
 const DEFAULT_MAX_BODY_BYTES: usize = 1_048_576; // 1 MiB
 
 // -----------------------------------------------------------------------------

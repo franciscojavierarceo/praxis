@@ -3,10 +3,9 @@
 
 //! Anthropic Messages request validation filter.
 //!
-//! Validates proxy-needed fields before forwarding. Rejects
-//! malformed requests with consistent 400 error responses.
-//! Does not create shared state or initialize persistence —
-//! Anthropic Messages has no stateful orchestration.
+//! Validates the JSON request envelope before forwarding.
+//! Backend-owned Anthropic API semantics remain the
+//! inference backend's responsibility.
 
 mod config;
 
@@ -38,8 +37,8 @@ use crate::{
 // AnthropicValidateFilter
 // -----------------------------------------------------------------------------
 
-/// Validates Anthropic Messages request bodies for proxy-needed
-/// fields. Rejects malformed requests before they reach the backend.
+/// Validates Anthropic Messages request bodies for proxy-owned
+/// JSON envelope requirements.
 ///
 /// # YAML
 ///
@@ -111,72 +110,18 @@ impl HttpFilter for AnthropicValidateFilter {
 // Validation
 // -----------------------------------------------------------------------------
 
-/// Validate proxy-needed fields in the request body.
+/// Validate the JSON envelope in the request body.
 fn validate_request(body: &[u8]) -> Option<Rejection> {
     let value: serde_json::Value = match serde_json::from_slice(body) {
         Ok(v) => v,
         Err(_) => return Some(reject("request body is not valid JSON")),
     };
 
-    let Some(obj) = value.as_object() else {
+    if !value.is_object() {
         return Some(reject("request body is not a JSON object"));
-    };
-
-    if let Err(msg) = check_model(obj) {
-        return Some(reject(&msg));
-    }
-
-    if let Err(msg) = check_max_tokens(obj) {
-        return Some(reject(&msg));
-    }
-
-    if let Err(msg) = check_messages(obj) {
-        return Some(reject(&msg));
     }
 
     None
-}
-
-/// Check that `model` is present and non-empty.
-fn check_model(obj: &serde_json::Map<String, serde_json::Value>) -> Result<(), String> {
-    match obj.get("model") {
-        Some(serde_json::Value::String(s)) if !s.is_empty() => Ok(()),
-        Some(serde_json::Value::String(_)) => Err("'model' must not be empty".to_owned()),
-        Some(_) => Err("'model' must be a string".to_owned()),
-        None => Err("'model' is required".to_owned()),
-    }
-}
-
-/// Check that `max_tokens` is present and > 0.
-fn check_max_tokens(obj: &serde_json::Map<String, serde_json::Value>) -> Result<(), String> {
-    match obj.get("max_tokens") {
-        Some(serde_json::Value::Number(n)) => {
-            if n.as_u64().is_some_and(|v| v > 0) {
-                Ok(())
-            } else {
-                Err("'max_tokens' must be a positive integer".to_owned())
-            }
-        },
-        Some(_) => Err("'max_tokens' must be a number".to_owned()),
-        None => Err("'max_tokens' is required".to_owned()),
-    }
-}
-
-/// Check that `messages` is a non-empty array.
-///
-/// Role ordering (e.g. first message must be `role: user`) is
-/// deferred to the backend, consistent with validating only what
-/// the proxy needs for its own operation.
-fn check_messages(obj: &serde_json::Map<String, serde_json::Value>) -> Result<(), String> {
-    let Some(serde_json::Value::Array(messages)) = obj.get("messages") else {
-        return Err("'messages' must be a non-empty array".to_owned());
-    };
-
-    if messages.is_empty() {
-        return Err("'messages' must not be empty".to_owned());
-    }
-
-    Ok(())
 }
 
 // -----------------------------------------------------------------------------

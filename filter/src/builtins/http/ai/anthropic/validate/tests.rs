@@ -16,51 +16,21 @@ fn valid_request_passes() {
 }
 
 #[test]
-fn missing_model_rejected() {
-    let body = br#"{"max_tokens":1024,"messages":[{"role":"user","content":"Hi"}]}"#;
-    let rejection = validate_request(body);
-    assert!(rejection.is_some(), "missing model should be rejected");
+fn backend_owned_semantics_pass() {
+    let body = br#"{"model":"","max_tokens":0,"messages":[]}"#;
+    assert!(
+        validate_request(body).is_none(),
+        "backend-owned Anthropic semantics should be deferred"
+    );
 }
 
 #[test]
-fn empty_model_rejected() {
-    let body = br#"{"model":"","max_tokens":1024,"messages":[{"role":"user","content":"Hi"}]}"#;
-    let rejection = validate_request(body);
-    assert!(rejection.is_some(), "empty model should be rejected");
-}
-
-#[test]
-fn missing_max_tokens_rejected() {
-    let body = br#"{"model":"claude-opus-4-8","messages":[{"role":"user","content":"Hi"}]}"#;
-    let rejection = validate_request(body);
-    assert!(rejection.is_some(), "missing max_tokens should be rejected");
-}
-
-#[test]
-fn zero_max_tokens_rejected() {
-    let body = br#"{"model":"claude-opus-4-8","max_tokens":0,"messages":[{"role":"user","content":"Hi"}]}"#;
-    let rejection = validate_request(body);
-    assert!(rejection.is_some(), "zero max_tokens should be rejected");
-}
-
-#[test]
-fn missing_messages_rejected() {
-    let body = br#"{"model":"claude-opus-4-8","max_tokens":1024}"#;
-    let rejection = validate_request(body);
-    assert!(rejection.is_some(), "missing messages should be rejected");
-}
-
-#[test]
-fn empty_messages_rejected() {
-    let body = br#"{"model":"claude-opus-4-8","max_tokens":1024,"messages":[]}"#;
-    let rejection = validate_request(body);
-    assert!(rejection.is_some(), "empty messages should be rejected");
-}
-
-#[test]
-fn first_message_not_user_passes() {
-    let body = br#"{"model":"claude-opus-4-8","max_tokens":1024,"messages":[{"role":"assistant","content":"Hi"}]}"#;
-    assert!(validate_request(body).is_none(), "role ordering deferred to backend");
+fn missing_backend_owned_fields_pass() {
+    let body = br#"{"metadata":{"tenant":"blue"}}"#;
+    assert!(
+        validate_request(body).is_none(),
+        "required Anthropic fields should be validated by the backend"
+    );
 }
 
 #[test]
@@ -68,6 +38,13 @@ fn invalid_json_rejected() {
     let body = b"not json {{{";
     let rejection = validate_request(body);
     assert!(rejection.is_some(), "invalid JSON should be rejected");
+}
+
+#[test]
+fn non_object_json_rejected() {
+    let body = br#"[]"#;
+    let rejection = validate_request(body);
+    assert!(rejection.is_some(), "non-object JSON should be rejected");
 }
 
 #[tokio::test]
