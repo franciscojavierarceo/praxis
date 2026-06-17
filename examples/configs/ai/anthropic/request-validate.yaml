@@ -1,0 +1,30 @@
+# Validates Anthropic Messages requests before forwarding
+#
+# Validates proxy-needed Anthropic Messages fields before forwarding:
+# `model`, `max_tokens`, and non-empty `messages`.
+# Invalid requests are rejected at the proxy with a 400 response.
+
+listeners:
+  - name: anthropic-gateway
+    address: "127.0.0.1:8080"
+    filter_chains: [anthropic-validate]
+
+filter_chains:
+  - name: anthropic-validate
+    filters:
+      - filter: anthropic_messages_format
+        on_invalid: reject
+
+      - filter: anthropic_validate
+        max_body_bytes: 1048576
+
+      - filter: router
+        routes:
+          - path: "/v1/messages"
+            cluster: "anthropic-backend"
+
+      - filter: load_balancer
+        clusters:
+          - name: "anthropic-backend"
+            endpoints:
+              - "127.0.0.1:3001"
