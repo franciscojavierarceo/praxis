@@ -70,6 +70,25 @@ fn invalid_json_rejected() {
     assert!(rejection.is_some(), "invalid JSON should be rejected");
 }
 
+#[tokio::test]
+async fn empty_body_rejected_by_filter() {
+    let yaml: serde_yaml::Value = serde_yaml::from_str("{}").unwrap();
+    let filter = AnthropicValidateFilter::from_config(&yaml).unwrap();
+    let req = Box::leak(Box::new(crate::test_utils::make_request(
+        http::Method::POST,
+        "/v1/messages",
+    )));
+    let mut ctx = crate::test_utils::make_filter_context(req);
+    let mut body = Some(Bytes::new());
+
+    let action = filter.on_request_body(&mut ctx, &mut body, true).await.unwrap();
+
+    assert!(
+        matches!(action, FilterAction::Reject(_)),
+        "empty body should be rejected"
+    );
+}
+
 // -----------------------------------------------------------------------------
 // Config
 // -----------------------------------------------------------------------------

@@ -94,9 +94,8 @@ impl HttpFilter for AnthropicValidateFilter {
             return Ok(FilterAction::Continue);
         }
 
-        let bytes = match body.as_ref() {
-            Some(b) if !b.is_empty() => b.as_ref(),
-            _ => return Ok(FilterAction::Continue),
+        let Some(bytes) = body.as_deref().filter(|b| !b.is_empty()) else {
+            return Ok(FilterAction::Reject(reject("request body is required")));
         };
 
         if let Some(rejection) = validate_request(bytes) {
@@ -186,9 +185,15 @@ fn check_messages(obj: &serde_json::Map<String, serde_json::Value>) -> Result<()
 
 /// Build a 400 rejection with a JSON error body.
 fn reject(message: &str) -> Rejection {
+    let body = serde_json::json!({
+        "error": {
+            "message": message,
+            "type": "invalid_request_error"
+        }
+    })
+    .to_string();
+
     Rejection::status(400)
         .with_header("content-type", "application/json")
-        .with_body(Bytes::from(format!(
-            r#"{{"error":{{"message":"{message}","type":"invalid_request_error"}}}}"#
-        )))
+        .with_body(Bytes::from(body))
 }
