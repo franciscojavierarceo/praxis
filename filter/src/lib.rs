@@ -8,7 +8,7 @@
 mod actions;
 mod any_filter;
 mod body;
-#[allow(unreachable_pub, reason = "internal pub items re-exported selectively")]
+#[expect(unreachable_pub, reason = "internal pub items re-exported selectively")]
 mod builtins;
 mod condition;
 mod context;
@@ -109,6 +109,7 @@ macro_rules! register_filters {
 // -----------------------------------------------------------------------------
 
 #[cfg(test)]
+#[expect(clippy::allow_attributes, reason = "blanket test suppressions")]
 #[allow(
     unreachable_pub,
     clippy::unwrap_used,
@@ -247,6 +248,7 @@ mod macro_tests {
 // -----------------------------------------------------------------------------
 
 #[cfg(test)]
+#[expect(clippy::allow_attributes, reason = "blanket test suppressions")]
 #[allow(clippy::expect_used, reason = "test utilities")]
 pub(crate) mod test_utils {
     use std::sync::LazyLock;
@@ -267,6 +269,7 @@ pub(crate) mod test_utils {
         }
     }
 
+    #[expect(clippy::allow_attributes, reason = "blanket test suppressions")]
     #[allow(
         clippy::too_many_lines,
         reason = "test context constructor mirrors all context fields"
