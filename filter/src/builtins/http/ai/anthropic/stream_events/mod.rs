@@ -31,8 +31,14 @@ use crate::{
 /// Metadata key for the partial line buffer between chunks.
 const LINE_BUFFER_KEY: &str = "anthropic_stream.line_buffer";
 
-/// Metadata key for the streaming state (JSON-serialized).
+/// Metadata key for the internal streaming state.
 const STREAM_STATE_KEY: &str = "anthropic_stream.state";
+
+/// Internal stream state value recorded after emitting `message_start`.
+const STREAM_STATE_STARTED: &str = "started";
+
+/// OpenAI Chat Completions SSE sentinel that marks logical stream completion.
+const OPENAI_DONE_SENTINEL: &str = "[DONE]";
 
 /// Metadata key tracking whether a text content block is open.
 const TEXT_BLOCK_OPEN_KEY: &str = "anthropic_stream.text_block_open";
@@ -182,7 +188,7 @@ fn is_known_non_streaming_transform(ctx: &HttpFilterContext<'_>) -> bool {
 fn process_event_block(ctx: &mut HttpFilterContext<'_>, block: &str, output: &mut Vec<u8>) {
     for line in block.lines() {
         if let Some(data) = line.strip_prefix("data: ") {
-            if data == "[DONE]" {
+            if data == OPENAI_DONE_SENTINEL {
                 emit_done(ctx, output);
             } else if let Ok(chunk) = serde_json::from_str::<Value>(data) {
                 transform_chunk(ctx, &chunk, output);
@@ -200,7 +206,7 @@ fn transform_chunk(ctx: &mut HttpFilterContext<'_>, chunk: &Value, output: &mut 
     let started = ctx
         .filter_metadata
         .get(STREAM_STATE_KEY)
-        .is_some_and(|v| v == "started");
+        .is_some_and(|v| v == STREAM_STATE_STARTED);
 
     if !started {
         emit_message_start(ctx, chunk, output);
@@ -245,7 +251,7 @@ fn emit_message_start(ctx: &mut HttpFilterContext<'_>, chunk: &Value, output: &m
             }
         }),
     );
-    ctx.set_metadata(STREAM_STATE_KEY, "started".to_owned());
+    ctx.set_metadata(STREAM_STATE_KEY, STREAM_STATE_STARTED.to_owned());
 }
 
 /// Extract the first choice from an `OpenAI` streaming chunk.
