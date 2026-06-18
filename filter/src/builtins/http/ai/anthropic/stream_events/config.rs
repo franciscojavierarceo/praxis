@@ -14,4 +14,8 @@ use serde::Deserialize;
 /// [`AnthropicStreamEventsFilter`]: super::AnthropicStreamEventsFilter
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[expect(
+    clippy::empty_structs_with_brackets,
+    reason = "serde empty-map config requires a named empty struct"
+)]
 pub(crate) struct AnthropicStreamEventsConfig {}

@@ -157,9 +157,8 @@ fn process_sse_chunk(ctx: &mut HttpFilterContext<'_>, chunk_str: &str) -> Bytes 
     let mut output = Vec::new();
     let mut remaining = combined.as_str();
 
-    while let Some(boundary) = remaining.find("\n\n") {
-        let event_block = &remaining[..boundary];
-        remaining = &remaining[boundary + 2..];
+    while let Some((event_block, rest)) = remaining.split_once("\n\n") {
+        remaining = rest;
         process_event_block(ctx, event_block, &mut output);
     }
 
@@ -500,16 +499,7 @@ fn emit_event(output: &mut Vec<u8>, event_type: &str, data: &Value) {
 // -----------------------------------------------------------------------------
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::needless_raw_strings,
-    clippy::needless_raw_string_hashes,
-    clippy::too_many_lines,
-    reason = "tests"
-)]
+#[expect(clippy::unwrap_used, reason = "tests")]
 mod tests {
     use super::*;
 
