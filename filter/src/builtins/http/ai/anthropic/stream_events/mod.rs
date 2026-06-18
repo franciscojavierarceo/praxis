@@ -670,6 +670,32 @@ mod tests {
     }
 
     #[test]
+    fn tool_call_delta_emits_tool_use_block_and_input_delta() {
+        let filter = make_filter();
+        let req = crate::test_utils::make_request(http::Method::POST, "/v1/messages");
+        let req: &'static crate::context::Request = Box::leak(Box::new(req));
+        let mut ctx = crate::test_utils::make_filter_context(req);
+
+        let tool_start = "data: {\"id\":\"c1\",\"model\":\"gpt-4\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"id\":\"call_1\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\"}}]},\"index\":0}]}\n\n";
+        let mut body = Some(Bytes::from(tool_start));
+        drop(filter.on_response_body(&mut ctx, &mut body, false).unwrap());
+
+        let out = String::from_utf8(body.unwrap().to_vec()).unwrap();
+        assert!(
+            out.contains("content_block_start") && out.contains(r#""type":"tool_use""#),
+            "tool delta should start an Anthropic tool_use block"
+        );
+        assert!(
+            out.contains(r#""id":"call_1""#) && out.contains(r#""name":"get_weather""#),
+            "tool_use block should preserve id and function name"
+        );
+        assert!(
+            out.contains("input_json_delta") && out.contains(r#""partial_json":"{\"city\":"#),
+            "tool arguments should stream as input_json_delta"
+        );
+    }
+
+    #[test]
     fn unknown_config_field_rejected() {
         let yaml: serde_yaml::Value = serde_yaml::from_str("max_body_bytes: 1048576").unwrap();
         let result = AnthropicStreamEventsFilter::from_config(&yaml);
