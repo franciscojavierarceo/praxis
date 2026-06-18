@@ -92,12 +92,7 @@ impl HttpFilter for AnthropicToOpenaiFilter {
     }
 
     async fn on_response(&self, ctx: &mut HttpFilterContext<'_>) -> Result<FilterAction, FilterError> {
-        let is_streaming = ctx
-            .filter_metadata
-            .get("anthropic_to_openai.streaming")
-            .is_some_and(|v| v == "true");
-
-        if !is_streaming {
+        if should_transform_response(ctx) {
             ctx.set_response_body_mode(BodyMode::StreamBuffer {
                 max_bytes: Some(self.config.max_body_bytes),
             });
@@ -144,12 +139,7 @@ impl HttpFilter for AnthropicToOpenaiFilter {
         body: &mut Option<Bytes>,
         end_of_stream: bool,
     ) -> Result<FilterAction, FilterError> {
-        let is_streaming = ctx
-            .filter_metadata
-            .get("anthropic_to_openai.streaming")
-            .is_some_and(|v| v == "true");
-
-        if is_streaming {
+        if !should_transform_response(ctx) {
             return Ok(FilterAction::Continue);
         }
 
@@ -242,6 +232,17 @@ fn transform_request_body(body: &mut Option<Bytes>) -> FilterAction {
 // Response Body Helpers
 // -----------------------------------------------------------------------------
 
+/// Return true when the response should be buffered and transformed.
+fn should_transform_response(ctx: &HttpFilterContext<'_>) -> bool {
+    let is_streaming = ctx
+        .filter_metadata
+        .get("anthropic_to_openai.streaming")
+        .is_some_and(|v| v == "true");
+    let is_success = ctx.response_header.as_ref().is_none_or(|r| r.status.is_success());
+
+    !is_streaming && is_success
+}
+
 /// Apply non-streaming JSON transformation to the response body.
 fn transform_non_streaming_body(ctx: &mut HttpFilterContext<'_>, body: &mut Option<Bytes>, request_model: &str) {
     let bytes = match body.as_ref() {
@@ -280,7 +281,11 @@ fn transform_non_streaming_body(ctx: &mut HttpFilterContext<'_>, body: &mut Opti
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "tests")]
 mod tests {
+    use bytes::Bytes;
+    use http::{Method, StatusCode};
+
     use super::*;
+    use crate::test_utils::{make_filter_context, make_request, make_response};
 
     #[test]
     fn default_config_parses() {
@@ -315,5 +320,25 @@ mod tests {
             result.is_err(),
             "max_body_bytes above 64 MiB ceiling should be rejected"
         );
+    }
+
+    #[test]
+    fn non_success_response_body_is_not_transformed() {
+        let yaml: serde_yaml::Value = serde_yaml::from_str("{}").unwrap();
+        let filter = AnthropicToOpenaiFilter::from_config(&yaml).unwrap();
+        let request = make_request(Method::POST, "/v1/messages");
+        let mut ctx = make_filter_context(&request);
+        let mut response = make_response();
+        response.status = StatusCode::BAD_REQUEST;
+        ctx.response_header = Some(&mut response);
+        ctx.set_metadata("anthropic_to_openai.streaming", "false");
+        ctx.set_metadata("anthropic_to_openai.model", "gpt-4");
+        let original = Bytes::from_static(br#"{"error":{"message":"bad request","type":"invalid_request_error"}}"#);
+        let mut body = Some(original.clone());
+
+        let action = filter.on_response_body(&mut ctx, &mut body, true).unwrap();
+
+        assert!(matches!(action, FilterAction::Continue), "filter should continue");
+        assert_eq!(body, Some(original), "upstream error body should pass through");
     }
 }

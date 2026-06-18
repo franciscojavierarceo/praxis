@@ -42,6 +42,7 @@ pub(crate) fn transform_request(body: &[u8]) -> Result<Vec<u8>, String> {
 
     map_parameters(&mut chat, obj);
     convert_tools(&mut chat, obj);
+    convert_parallel_tool_calls(&mut chat, obj);
     convert_tool_choice(&mut chat, obj);
 
     serde_json::to_vec(&Value::Object(chat)).map_err(|e| format!("serialization failed: {e}"))
@@ -193,12 +194,20 @@ fn convert_tool_use_block(block: &Value, tool_calls: &mut Vec<Value>) {
 fn convert_tool_result_block(block: &Value, messages: &mut Vec<Value>) {
     let tool_call_id = block.get("tool_use_id").and_then(Value::as_str).unwrap_or("");
     let result_content = extract_tool_result_content(block);
+    let image_content = extract_tool_result_image_content(block);
 
     messages.push(json!({
         "role": "tool",
         "tool_call_id": tool_call_id,
         "content": result_content
     }));
+
+    if !image_content.is_empty() {
+        messages.push(json!({
+            "role": "user",
+            "content": image_content
+        }));
+    }
 }
 
 /// Emit the final message for accumulated content and tool calls.
@@ -292,6 +301,21 @@ fn extract_tool_result_content(block: &Value) -> String {
     }
 }
 
+/// Extract image content from a `tool_result` block.
+fn extract_tool_result_image_content(block: &Value) -> Vec<Value> {
+    let Some(Value::Array(parts)) = block.get("content") else {
+        return Vec::new();
+    };
+
+    let mut image_parts = Vec::new();
+    for part in parts {
+        if part.get("type").and_then(Value::as_str) == Some("image") {
+            convert_image_block(part, &mut image_parts);
+        }
+    }
+    image_parts
+}
+
 // -----------------------------------------------------------------------------
 // Parameter Mapping
 // -----------------------------------------------------------------------------
@@ -366,11 +390,30 @@ fn convert_tools(chat: &mut Map<String, Value>, obj: &Map<String, Value>) {
 // Tool Choice Conversion
 // -----------------------------------------------------------------------------
 
+/// Convert Anthropic `disable_parallel_tool_use` to Chat Completions format.
+fn convert_parallel_tool_calls(chat: &mut Map<String, Value>, obj: &Map<String, Value>) {
+    let Some(Value::Object(tool_choice)) = obj.get("tool_choice") else {
+        return;
+    };
+
+    if tool_choice
+        .get("disable_parallel_tool_use")
+        .and_then(Value::as_bool)
+        .is_some_and(|disabled| disabled)
+    {
+        chat.insert("parallel_tool_calls".to_owned(), Value::Bool(false));
+    }
+}
+
 /// Convert Anthropic `tool_choice` to Chat Completions format.
 fn convert_tool_choice(chat: &mut Map<String, Value>, obj: &Map<String, Value>) {
     let Some(tool_choice) = obj.get("tool_choice") else {
         return;
     };
+
+    if obj.contains_key("tools") && !chat.contains_key("tools") {
+        return;
+    }
 
     let chat_choice = match tool_choice {
         Value::String(s) => match s.as_str() {
@@ -378,16 +421,17 @@ fn convert_tool_choice(chat: &mut Map<String, Value>, obj: &Map<String, Value>) 
             "none" => Value::String("none".to_owned()),
             _ => Value::String("auto".to_owned()),
         },
-        Value::Object(tc) => {
-            if tc.get("type").and_then(Value::as_str) == Some("tool") {
+        Value::Object(tc) => match tc.get("type").and_then(Value::as_str) {
+            Some("any") => Value::String("required".to_owned()),
+            Some("none") => Value::String("none".to_owned()),
+            Some("tool") => {
                 if let Some(name) = tc.get("name").and_then(Value::as_str) {
                     json!({"type": "function", "function": {"name": name}})
                 } else {
                     Value::String("auto".to_owned())
                 }
-            } else {
-                Value::String("auto".to_owned())
-            }
+            },
+            _ => Value::String("auto".to_owned()),
         },
         _ => return,
     };
@@ -472,6 +516,28 @@ mod tests {
     }
 
     #[test]
+    fn tool_result_image_promoted_to_followup_user_message() {
+        let body = br#"{"model":"claude-opus-4-8","max_tokens":1024,"messages":[{"role":"user","content":[{"type":"tool_result","tool_use_id":"call_1","content":[{"type":"text","text":"chart"},{"type":"image","source":{"type":"url","url":"https://example.com/chart.png"}}]}]}]}"#;
+        let result = transform_request(body).unwrap();
+        let parsed: Value = serde_json::from_slice(&result).unwrap();
+
+        assert_eq!(parsed["messages"][0]["role"], "tool", "first message is tool result");
+        assert_eq!(parsed["messages"][0]["content"], "chart", "tool text content");
+        assert_eq!(
+            parsed["messages"][1]["role"], "user",
+            "image should be promoted to user message"
+        );
+        assert_eq!(
+            parsed["messages"][1]["content"][0]["type"], "image_url",
+            "promoted image content type"
+        );
+        assert_eq!(
+            parsed["messages"][1]["content"][0]["image_url"]["url"], "https://example.com/chart.png",
+            "promoted image URL"
+        );
+    }
+
+    #[test]
     fn stop_sequences_mapped() {
         let body =
             br#"{"model":"claude-opus-4-8","max_tokens":1024,"stop_sequences":["END"],"messages":[{"role":"user","content":"Hi"}]}"#;
@@ -488,6 +554,40 @@ mod tests {
         let parsed: Value = serde_json::from_slice(&result).unwrap();
 
         assert_eq!(parsed["tool_choice"], "required", "any maps to required");
+    }
+
+    #[test]
+    fn tool_choice_object_any_mapped() {
+        let body = br#"{"model":"claude-opus-4-8","max_tokens":1024,"tools":[{"name":"get_weather","description":"Get weather","input_schema":{"type":"object","properties":{}}}],"tool_choice":{"type":"any"},"messages":[{"role":"user","content":"Hi"}]}"#;
+        let result = transform_request(body).unwrap();
+        let parsed: Value = serde_json::from_slice(&result).unwrap();
+
+        assert_eq!(parsed["tool_choice"], "required", "object-form any maps to required");
+    }
+
+    #[test]
+    fn tool_choice_dropped_when_all_tools_filtered() {
+        let body = br#"{"model":"claude-opus-4-8","max_tokens":1024,"tools":[{"type":"web_search_20250305","name":"web_search"}],"tool_choice":"any","messages":[{"role":"user","content":"Hi"}]}"#;
+        let result = transform_request(body).unwrap();
+        let parsed: Value = serde_json::from_slice(&result).unwrap();
+
+        assert!(parsed.get("tools").is_none(), "server-side tools should be filtered");
+        assert!(
+            parsed.get("tool_choice").is_none(),
+            "tool_choice without translated tools should be dropped"
+        );
+    }
+
+    #[test]
+    fn disable_parallel_tool_use_mapped() {
+        let body = br#"{"model":"claude-opus-4-8","max_tokens":1024,"tools":[{"name":"get_weather","description":"Get weather","input_schema":{"type":"object","properties":{}}}],"tool_choice":{"type":"auto","disable_parallel_tool_use":true},"messages":[{"role":"user","content":"Hi"}]}"#;
+        let result = transform_request(body).unwrap();
+        let parsed: Value = serde_json::from_slice(&result).unwrap();
+
+        assert_eq!(
+            parsed["parallel_tool_calls"], false,
+            "disable_parallel_tool_use should disable parallel tool calls"
+        );
     }
 
     #[test]
