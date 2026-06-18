@@ -212,15 +212,7 @@ fn timestamp_hex_id() -> String {
 // -----------------------------------------------------------------------------
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    clippy::needless_raw_strings,
-    clippy::needless_raw_string_hashes,
-    reason = "tests"
-)]
+#[expect(clippy::unwrap_used, clippy::indexing_slicing, reason = "tests")]
 mod tests {
     use super::*;
 

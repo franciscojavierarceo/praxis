@@ -269,7 +269,7 @@ fn transform_non_streaming_body(ctx: &mut HttpFilterContext<'_>, body: &mut Opti
 // -----------------------------------------------------------------------------
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic, reason = "tests")]
+#[expect(clippy::unwrap_used, reason = "tests")]
 mod tests {
     use super::*;
 
