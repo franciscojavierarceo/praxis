@@ -3,9 +3,10 @@
 
 //! Integration tests for Anthropic Messages API filters.
 //!
-//! Ported from OGX's `test_messages.py` — each Rust test maps 1:1
-//! to its Python counterpart. Tests validate the full request/response
-//! cycle through Praxis with passthrough and transform filter chains.
+//! Ported from OGX's `test_messages.py`, with proxy-boundary tests
+//! for backend-owned validation cases. Tests validate the full
+//! request/response cycle through Praxis with passthrough and transform
+//! filter chains.
 
 use praxis_core::config::Config;
 use praxis_test_utils::{
