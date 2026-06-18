@@ -10,13 +10,7 @@
 mod config;
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::indexing_slicing,
-    clippy::panic,
-    reason = "tests"
-)]
+#[expect(clippy::unwrap_used, reason = "tests")]
 mod tests;
 
 use std::borrow::Cow;
