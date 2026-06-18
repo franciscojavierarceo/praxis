@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Praxis Contributors
 
-//! Anthropic Messages to `OpenAI` Chat Completions transformation filter.
+//! Anthropic Messages to Chat Completions-compatible transformation filter.
 //!
-//! Rewrites Anthropic Messages request bodies to `OpenAI` Chat
-//! Completions format and transforms non-streaming responses back.
+//! Rewrites Anthropic Messages request bodies to the Chat Completions
+//! request shape and transforms compatible non-streaming responses back.
 //! Streaming SSE transformation is handled by the separate
 //! `anthropic_stream_events` filter.
+//!
+//! The filter name preserves the proposal/config surface. `OpenAI` here
+//! means the Chat Completions wire shape, not the Responses API or
+//! OpenAI-only backends.
 
 mod config;
 pub(crate) mod request;
@@ -28,8 +32,10 @@ use crate::{
 // AnthropicToOpenaiFilter
 // -----------------------------------------------------------------------------
 
-/// Transforms Anthropic Messages API requests to `OpenAI` Chat
-/// Completions format and transforms responses back.
+/// Transforms Anthropic Messages API requests to Chat Completions-compatible
+/// request bodies and transforms compatible responses back. The filter name
+/// refers to the OpenAI Chat Completions wire shape, not the Responses API;
+/// non-OpenAI compatible backends are valid targets.
 ///
 /// # YAML
 ///
@@ -214,7 +220,7 @@ fn transform_request_body(body: &mut Option<Bytes>) -> FilterAction {
             debug!(
                 original_len = bytes.len(),
                 transformed_len = transformed.len(),
-                "transformed Anthropic request to OpenAI"
+                "transformed Anthropic request to Chat Completions-compatible format"
             );
             *body = Some(Bytes::from(transformed));
             FilterAction::Continue
@@ -253,13 +259,16 @@ fn transform_non_streaming_body(ctx: &mut HttpFilterContext<'_>, body: &mut Opti
                 original_len = bytes.len(),
                 transformed_len = result.body.len(),
                 original_finish_reason = result.original_finish_reason.as_str(),
-                "transformed OpenAI response to Anthropic"
+                "transformed Chat Completions-compatible response to Anthropic"
             );
             ctx.set_metadata("openai.finish_reason", result.original_finish_reason);
             *body = Some(Bytes::from(result.body));
         },
         Err(msg) => {
-            warn!(error = msg.as_str(), "failed to transform OpenAI response");
+            warn!(
+                error = msg.as_str(),
+                "failed to transform Chat Completions-compatible response"
+            );
         },
     }
 }

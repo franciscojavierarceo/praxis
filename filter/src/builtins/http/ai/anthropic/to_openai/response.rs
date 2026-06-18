@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Praxis Contributors
 
-//! `OpenAI` Chat Completions to Anthropic Messages response transformation
-//! (non-streaming).
+//! Chat Completions-compatible response to Anthropic Messages transformation.
 
 use serde_json::{Map, Value, json};
 
@@ -24,11 +23,11 @@ const RESPONSE_ROLE: &str = "assistant";
 pub(crate) struct TransformResult {
     /// Transformed response body bytes.
     pub body: Vec<u8>,
-    /// Original `OpenAI` `finish_reason` (preserved for metadata).
+    /// Original Chat Completions `finish_reason` (preserved for metadata).
     pub original_finish_reason: String,
 }
 
-/// Transform an `OpenAI` Chat Completions response body into Anthropic
+/// Transform a Chat Completions-compatible response body into Anthropic
 /// Messages format.
 pub(crate) fn transform_response(body: &[u8], request_model: &str) -> Result<TransformResult, String> {
     let value: Value = serde_json::from_slice(body).map_err(|e| format!("invalid JSON: {e}"))?;
@@ -131,7 +130,7 @@ fn extract_tool_call_blocks(message: Option<&Value>, blocks: &mut Vec<Value>) {
 // Finish Reason Mapping
 // -----------------------------------------------------------------------------
 
-/// Map `OpenAI` `finish_reason` to Anthropic `stop_reason`.
+/// Map Chat Completions `finish_reason` to Anthropic `stop_reason`.
 ///
 /// Returns `(anthropic_stop_reason, original_finish_reason)`.
 /// The `content_filter` to `end_turn` mapping is lossy; the
@@ -158,7 +157,7 @@ fn map_finish_reason(obj: &Map<String, Value>) -> (String, String) {
 // Usage Mapping
 // -----------------------------------------------------------------------------
 
-/// Build Anthropic usage object from `OpenAI` usage.
+/// Build Anthropic usage object from Chat Completions usage.
 fn build_usage(obj: &Map<String, Value>) -> Value {
     let usage = obj.get("usage");
 

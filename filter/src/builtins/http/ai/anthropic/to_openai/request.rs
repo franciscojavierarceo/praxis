@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Praxis Contributors
 
-//! Anthropic Messages to `OpenAI` Chat Completions request transformation.
+//! Anthropic Messages to Chat Completions-compatible request transformation.
 
 use serde_json::{Map, Value, json};
 use tracing::warn;
@@ -10,8 +10,8 @@ use tracing::warn;
 // Request Transformation
 // -----------------------------------------------------------------------------
 
-/// Transform an Anthropic Messages request body into `OpenAI` Chat
-/// Completions format.
+/// Transform an Anthropic Messages request body into Chat
+/// Completions-compatible format.
 ///
 /// Returns the transformed JSON bytes, or an error message.
 pub(crate) fn transform_request(body: &[u8]) -> Result<Vec<u8>, String> {
@@ -21,37 +21,37 @@ pub(crate) fn transform_request(body: &[u8]) -> Result<Vec<u8>, String> {
         return Err("request body is not a JSON object".to_owned());
     };
 
-    let mut openai = Map::new();
+    let mut chat = Map::new();
 
     if let Some(model) = obj.get("model") {
-        openai.insert("model".to_owned(), model.clone());
+        chat.insert("model".to_owned(), model.clone());
     }
 
     let mut messages = Vec::new();
     hoist_system(&mut messages, obj);
     convert_messages(&mut messages, obj);
-    openai.insert("messages".to_owned(), Value::Array(messages));
+    chat.insert("messages".to_owned(), Value::Array(messages));
 
     if let Some(max_tokens) = obj.get("max_tokens") {
-        openai.insert("max_tokens".to_owned(), max_tokens.clone());
+        chat.insert("max_tokens".to_owned(), max_tokens.clone());
     }
 
     if let Some(stream) = obj.get("stream") {
-        openai.insert("stream".to_owned(), stream.clone());
+        chat.insert("stream".to_owned(), stream.clone());
     }
 
-    map_parameters(&mut openai, obj);
-    convert_tools(&mut openai, obj);
-    convert_tool_choice(&mut openai, obj);
+    map_parameters(&mut chat, obj);
+    convert_tools(&mut chat, obj);
+    convert_tool_choice(&mut chat, obj);
 
-    serde_json::to_vec(&Value::Object(openai)).map_err(|e| format!("serialization failed: {e}"))
+    serde_json::to_vec(&Value::Object(chat)).map_err(|e| format!("serialization failed: {e}"))
 }
 
 // -----------------------------------------------------------------------------
 // System Message Hoisting
 // -----------------------------------------------------------------------------
 
-/// Hoist Anthropic top-level `system` to an `OpenAI` system message.
+/// Hoist Anthropic top-level `system` to a Chat Completions system message.
 fn hoist_system(messages: &mut Vec<Value>, obj: &Map<String, Value>) {
     let Some(system) = obj.get("system") else {
         return;
@@ -80,7 +80,7 @@ fn hoist_system(messages: &mut Vec<Value>, obj: &Map<String, Value>) {
 // Message Conversion
 // -----------------------------------------------------------------------------
 
-/// Convert Anthropic messages array to `OpenAI` messages.
+/// Convert Anthropic messages array to Chat Completions messages.
 fn convert_messages(messages: &mut Vec<Value>, obj: &Map<String, Value>) {
     let Some(Value::Array(anthropic_messages)) = obj.get("messages") else {
         return;
@@ -105,7 +105,7 @@ fn convert_messages(messages: &mut Vec<Value>, obj: &Map<String, Value>) {
     }
 }
 
-/// Convert typed content blocks to `OpenAI` format.
+/// Convert typed content blocks to Chat Completions-compatible format.
 fn convert_content_blocks(messages: &mut Vec<Value>, role: &str, blocks: &[Value]) {
     let mut text_parts = Vec::new();
     let mut content_parts: Vec<Value> = Vec::new();
@@ -175,7 +175,7 @@ fn convert_image_block(block: &Value, content_parts: &mut Vec<Value>) {
     }
 }
 
-/// Convert a `tool_use` content block to an `OpenAI` tool call.
+/// Convert a `tool_use` content block to a Chat Completions tool call.
 fn convert_tool_use_block(block: &Value, tool_calls: &mut Vec<Value>) {
     let id = block.get("id").and_then(Value::as_str).unwrap_or("");
     let name = block.get("name").and_then(Value::as_str).unwrap_or("");
@@ -189,7 +189,7 @@ fn convert_tool_use_block(block: &Value, tool_calls: &mut Vec<Value>) {
     }));
 }
 
-/// Convert a `tool_result` content block to an `OpenAI` tool message.
+/// Convert a `tool_result` content block to a Chat Completions tool message.
 fn convert_tool_result_block(block: &Value, messages: &mut Vec<Value>) {
     let tool_call_id = block.get("tool_use_id").and_then(Value::as_str).unwrap_or("");
     let result_content = extract_tool_result_content(block);
@@ -254,7 +254,7 @@ fn flush_text_parts(
 // Image Source Conversion
 // -----------------------------------------------------------------------------
 
-/// Convert Anthropic image source to `OpenAI` `image_url` URL string.
+/// Convert Anthropic image source to an `image_url` URL string.
 fn convert_image_source(source: &Value) -> Option<String> {
     let source_type = source.get("type").and_then(Value::as_str)?;
 
@@ -296,26 +296,26 @@ fn extract_tool_result_content(block: &Value) -> String {
 // Parameter Mapping
 // -----------------------------------------------------------------------------
 
-/// Map Anthropic parameters to `OpenAI` equivalents.
+/// Map Anthropic parameters to Chat Completions-compatible equivalents.
 ///
-/// `top_k` has no standard `OpenAI` equivalent but is preserved
+/// `top_k` has no standard Chat Completions equivalent but is preserved
 /// as an extra body parameter for backends that support it
 /// (e.g. vLLM).
-fn map_parameters(openai: &mut Map<String, Value>, obj: &Map<String, Value>) {
+fn map_parameters(chat: &mut Map<String, Value>, obj: &Map<String, Value>) {
     if let Some(stop) = obj.get("stop_sequences") {
-        openai.insert("stop".to_owned(), stop.clone());
+        chat.insert("stop".to_owned(), stop.clone());
     }
 
     if let Some(temp) = obj.get("temperature") {
-        openai.insert("temperature".to_owned(), temp.clone());
+        chat.insert("temperature".to_owned(), temp.clone());
     }
 
     if let Some(top_p) = obj.get("top_p") {
-        openai.insert("top_p".to_owned(), top_p.clone());
+        chat.insert("top_p".to_owned(), top_p.clone());
     }
 
     if let Some(top_k) = obj.get("top_k") {
-        openai.insert("top_k".to_owned(), top_k.clone());
+        chat.insert("top_k".to_owned(), top_k.clone());
     }
 }
 
@@ -323,13 +323,13 @@ fn map_parameters(openai: &mut Map<String, Value>, obj: &Map<String, Value>) {
 // Tool Conversion
 // -----------------------------------------------------------------------------
 
-/// Convert Anthropic tool definitions to `OpenAI` function tools.
-fn convert_tools(openai: &mut Map<String, Value>, obj: &Map<String, Value>) {
+/// Convert Anthropic tool definitions to Chat Completions function tools.
+fn convert_tools(chat: &mut Map<String, Value>, obj: &Map<String, Value>) {
     let Some(Value::Array(tools)) = obj.get("tools") else {
         return;
     };
 
-    let mut openai_tools = Vec::new();
+    let mut chat_tools = Vec::new();
 
     for tool in tools {
         let tool_type = tool.get("type").and_then(Value::as_str).unwrap_or("custom");
@@ -347,7 +347,7 @@ fn convert_tools(openai: &mut Map<String, Value>, obj: &Map<String, Value>) {
             .cloned()
             .unwrap_or_else(|| json!({"type": "object"}));
 
-        openai_tools.push(json!({
+        chat_tools.push(json!({
             "type": "function",
             "function": {
                 "name": name,
@@ -357,8 +357,8 @@ fn convert_tools(openai: &mut Map<String, Value>, obj: &Map<String, Value>) {
         }));
     }
 
-    if !openai_tools.is_empty() {
-        openai.insert("tools".to_owned(), Value::Array(openai_tools));
+    if !chat_tools.is_empty() {
+        chat.insert("tools".to_owned(), Value::Array(chat_tools));
     }
 }
 
@@ -366,13 +366,13 @@ fn convert_tools(openai: &mut Map<String, Value>, obj: &Map<String, Value>) {
 // Tool Choice Conversion
 // -----------------------------------------------------------------------------
 
-/// Convert Anthropic `tool_choice` to `OpenAI` format.
-fn convert_tool_choice(openai: &mut Map<String, Value>, obj: &Map<String, Value>) {
+/// Convert Anthropic `tool_choice` to Chat Completions format.
+fn convert_tool_choice(chat: &mut Map<String, Value>, obj: &Map<String, Value>) {
     let Some(tool_choice) = obj.get("tool_choice") else {
         return;
     };
 
-    let openai_choice = match tool_choice {
+    let chat_choice = match tool_choice {
         Value::String(s) => match s.as_str() {
             "any" => Value::String("required".to_owned()),
             "none" => Value::String("none".to_owned()),
@@ -392,7 +392,7 @@ fn convert_tool_choice(openai: &mut Map<String, Value>, obj: &Map<String, Value>
         _ => return,
     };
 
-    openai.insert("tool_choice".to_owned(), openai_choice);
+    chat.insert("tool_choice".to_owned(), chat_choice);
 }
 
 // -----------------------------------------------------------------------------

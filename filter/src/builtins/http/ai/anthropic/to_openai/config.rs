@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Praxis Contributors
 
-//! Configuration for the Anthropic-to-OpenAI transformation filter.
+//! Configuration for the Anthropic-to-Chat-Completions transformation filter.
 
 use serde::Deserialize;
 
