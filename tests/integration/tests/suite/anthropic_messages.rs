@@ -525,7 +525,7 @@ fn parse_sse_events(body: &str) -> Vec<serde_json::Value> {
         } else if let Some(data) = line.strip_prefix("data: ")
             && let Ok(mut value) = serde_json::from_str::<serde_json::Value>(data)
         {
-            if let Some(ref et) = current_event_type {
+            if let Some(et) = &current_event_type {
                 value["_event_type"] = serde_json::Value::String(et.clone());
             }
             events.push(value);
