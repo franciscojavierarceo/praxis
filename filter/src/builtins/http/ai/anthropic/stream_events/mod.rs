@@ -4,10 +4,7 @@
 //! Anthropic SSE event transformation filter.
 //!
 //! Transforms `OpenAI` Chat Completions SSE events into Anthropic
-//! Messages SSE events per-chunk as they arrive. Each
-//! `on_response_body` call processes whatever bytes were received,
-//! transforms complete SSE events, and forwards immediately.
-//! Partial events are held in filter metadata until the next chunk.
+//! Messages SSE events per-chunk while buffering partial events.
 
 mod config;
 
@@ -519,10 +516,7 @@ mod tests {
 
     #[test]
     fn incremental_text_chunks_transformed_immediately() {
-        let filter = make_filter();
-        let req = crate::test_utils::make_request(http::Method::POST, "/v1/messages");
-        let req: &'static crate::context::Request = Box::leak(Box::new(req));
-        let mut ctx = crate::test_utils::make_filter_context(req);
+        let (filter, mut ctx) = make_filter_and_context();
 
         let chunk1 = "data: {\"id\":\"c1\",\"model\":\"gpt-4\",\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"index\":0}]}\n\n";
         let mut body1 = Some(Bytes::from(chunk1));
@@ -548,10 +542,7 @@ mod tests {
 
     #[test]
     fn partial_chunk_buffered_until_complete() {
-        let filter = make_filter();
-        let req = crate::test_utils::make_request(http::Method::POST, "/v1/messages");
-        let req: &'static crate::context::Request = Box::leak(Box::new(req));
-        let mut ctx = crate::test_utils::make_filter_context(req);
+        let (filter, mut ctx) = make_filter_and_context();
 
         let partial = "data: {\"id\":\"c1\",\"model\":\"gpt-4\",\"choices\":[{\"delta\":{\"role\":\"assistant\"";
         let mut body1 = Some(Bytes::from(partial));
@@ -573,10 +564,7 @@ mod tests {
 
     #[test]
     fn done_emits_final_events() {
-        let filter = make_filter();
-        let req = crate::test_utils::make_request(http::Method::POST, "/v1/messages");
-        let req: &'static crate::context::Request = Box::leak(Box::new(req));
-        let mut ctx = crate::test_utils::make_filter_context(req);
+        let (filter, mut ctx) = make_filter_and_context();
 
         let chunk1 = "data: {\"id\":\"c1\",\"model\":\"gpt-4\",\"choices\":[{\"delta\":{\"content\":\"Hi\"},\"index\":0,\"finish_reason\":\"stop\"}]}\n\n";
         let mut body1 = Some(Bytes::from(chunk1));
@@ -594,10 +582,7 @@ mod tests {
 
     #[test]
     fn no_full_response_buffering() {
-        let filter = make_filter();
-        let req = crate::test_utils::make_request(http::Method::POST, "/v1/messages");
-        let req: &'static crate::context::Request = Box::leak(Box::new(req));
-        let mut ctx = crate::test_utils::make_filter_context(req);
+        let (filter, mut ctx) = make_filter_and_context();
 
         let chunks = vec![
             "data: {\"id\":\"c1\",\"model\":\"gpt-4\",\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"index\":0}]}\n\n",
@@ -654,10 +639,7 @@ mod tests {
 
     #[test]
     fn tool_block_is_closed_at_done() {
-        let filter = make_filter();
-        let req = crate::test_utils::make_request(http::Method::POST, "/v1/messages");
-        let req: &'static crate::context::Request = Box::leak(Box::new(req));
-        let mut ctx = crate::test_utils::make_filter_context(req);
+        let (filter, mut ctx) = make_filter_and_context();
 
         let tool_start = "data: {\"id\":\"c1\",\"model\":\"gpt-4\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"id\":\"call_1\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{}\"}}]},\"index\":0}]}\n\n";
         let mut body1 = Some(Bytes::from(tool_start));
@@ -677,10 +659,7 @@ mod tests {
 
     #[test]
     fn tool_call_delta_emits_tool_use_block_and_input_delta() {
-        let filter = make_filter();
-        let req = crate::test_utils::make_request(http::Method::POST, "/v1/messages");
-        let req: &'static crate::context::Request = Box::leak(Box::new(req));
-        let mut ctx = crate::test_utils::make_filter_context(req);
+        let (filter, mut ctx) = make_filter_and_context();
 
         let tool_start = "data: {\"id\":\"c1\",\"model\":\"gpt-4\",\"choices\":[{\"delta\":{\"tool_calls\":[{\"id\":\"call_1\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\"}}]},\"index\":0}]}\n\n";
         let mut body = Some(Bytes::from(tool_start));
@@ -717,5 +696,13 @@ mod tests {
     fn make_filter() -> Box<dyn HttpFilter> {
         let yaml: serde_yaml::Value = serde_yaml::from_str("{}").unwrap();
         AnthropicStreamEventsFilter::from_config(&yaml).unwrap()
+    }
+
+    fn make_filter_and_context() -> (Box<dyn HttpFilter>, HttpFilterContext<'static>) {
+        let req = crate::test_utils::make_request(http::Method::POST, "/v1/messages");
+        (
+            make_filter(),
+            crate::test_utils::make_filter_context(Box::leak(Box::new(req))),
+        )
     }
 }
