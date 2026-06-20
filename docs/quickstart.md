@@ -23,6 +23,29 @@ curl http://127.0.0.1:8080/
 {"status": "ok", "server": "praxis"}
 ```
 
+## Bootstrap a starter config
+
+Generate a starter config:
+
+```console
+praxis init responses passthrough
+```
+
+For Anthropic Messages traffic, use:
+
+```console
+praxis init messages protocol
+```
+
+This writes `./praxis.yaml` with a curated starter recipe and prints
+the next validation and run commands.
+
+Start Praxis with the generated config:
+
+```console
+./target/release/praxis -c praxis.yaml
+```
+
 ## Proxy to a backend
 
 Create `praxis.yaml`:

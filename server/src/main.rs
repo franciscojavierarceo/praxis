@@ -17,8 +17,12 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 mod commands;
 mod dump;
+/// Starter-config generation helpers for `praxis init`.
+mod init;
 
-use clap::Parser;
+use std::io::Write as _;
+
+use clap::{Parser, Subcommand, ValueEnum};
 use tracing::info;
 
 // -----------------------------------------------------------------------------
@@ -40,6 +44,44 @@ struct Cli {
     /// Validate configuration and exit.
     #[arg(short = 't', long = "validate")]
     validate: bool,
+
+    /// Generate a starter config for a common Praxis workflow.
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+/// Top-level `praxis` subcommands.
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Generate a starter config from a curated recipe.
+    Init {
+        /// Incoming API family or traffic shape.
+        family: InitFamily,
+        /// Starter recipe within the selected family.
+        recipe: InitRecipe,
+    },
+}
+
+/// Supported starter-config families for `praxis init`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum InitFamily {
+    /// Anthropic Messages API starters.
+    Messages,
+    /// OpenAI Responses API starters.
+    Responses,
+}
+
+/// Supported starter recipes for `praxis init`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum InitRecipe {
+    /// Native Messages protocol starter for `/v1/messages` backends.
+    Protocol,
+    /// Transform Messages traffic to a Chat Completions-style backend.
+    ToOpenai,
+    /// Minimal mode-aware routing for Responses traffic.
+    Passthrough,
+    /// End-to-end Responses pipeline with validation and response storage.
+    FullFlow,
 }
 
 // -----------------------------------------------------------------------------
@@ -50,6 +92,11 @@ struct Cli {
 #[expect(clippy::print_stderr, reason = "fatal error output")]
 fn main() {
     let cli = Cli::parse();
+    if let Some(Command::Init { family, recipe }) = cli.command {
+        handle_init_command(family, recipe);
+        return;
+    }
+
     let explicit = cli.config.or_else(|| std::env::var("PRAXIS_CONFIG").ok());
 
     if cli.validate {
@@ -75,6 +122,20 @@ fn main() {
     praxis::run_server(config, config_path)
 }
 
+/// Execute `praxis init` for a selected starter family and recipe.
+fn handle_init_command(family: InitFamily, recipe: InitRecipe) {
+    let cwd = std::env::current_dir().unwrap_or_else(|e| praxis::fatal(&e));
+    match init::run_init(&cwd, family, recipe) {
+        Ok(summary) => {
+            std::io::stdout()
+                .write_all(summary.as_bytes())
+                .and_then(|()| std::io::stdout().write_all(b"\n"))
+                .unwrap_or_else(|e| praxis::fatal(&e));
+        },
+        Err(e) => praxis::fatal(&format!("init failed: {e}")),
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Tests
 // -----------------------------------------------------------------------------
@@ -85,7 +146,7 @@ fn main() {
 mod tests {
     use clap::Parser as _;
 
-    use super::Cli;
+    use super::{Cli, Command, InitFamily, InitRecipe};
 
     // -------------------------------------------------------------------------
     // --validate CLI parsing
@@ -152,5 +213,55 @@ mod tests {
     fn cli_dump_short_conflicts_with_validate_short() {
         let result = Cli::try_parse_from(["praxis", "-T", "-t"]);
         assert!(result.is_err(), "-T and -t should conflict");
+    }
+
+    // -------------------------------------------------------------------------
+    // init CLI parsing
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn cli_init_responses_passthrough() {
+        let cli = Cli::parse_from(["praxis", "init", "responses", "passthrough"]);
+        let Some(Command::Init { family, recipe }) = cli.command else {
+            unreachable!("expected init command");
+        };
+        assert_eq!(family, InitFamily::Responses);
+        assert_eq!(recipe, InitRecipe::Passthrough);
+    }
+
+    #[test]
+    fn cli_init_responses_full_flow() {
+        let cli = Cli::parse_from(["praxis", "init", "responses", "full-flow"]);
+        let Some(Command::Init { family, recipe }) = cli.command else {
+            unreachable!("expected init command");
+        };
+        assert_eq!(family, InitFamily::Responses);
+        assert_eq!(recipe, InitRecipe::FullFlow);
+    }
+
+    #[test]
+    fn cli_init_unknown_recipe_rejected() {
+        let result = Cli::try_parse_from(["praxis", "init", "responses", "unknown"]);
+        assert!(result.is_err(), "unknown init recipe should fail clap parsing");
+    }
+
+    #[test]
+    fn cli_init_messages_protocol() {
+        let cli = Cli::parse_from(["praxis", "init", "messages", "protocol"]);
+        let Some(Command::Init { family, recipe }) = cli.command else {
+            unreachable!("expected init command");
+        };
+        assert_eq!(family, InitFamily::Messages);
+        assert_eq!(recipe, InitRecipe::Protocol);
+    }
+
+    #[test]
+    fn cli_init_messages_to_openai() {
+        let cli = Cli::parse_from(["praxis", "init", "messages", "to-openai"]);
+        let Some(Command::Init { family, recipe }) = cli.command else {
+            unreachable!("expected init command");
+        };
+        assert_eq!(family, InitFamily::Messages);
+        assert_eq!(recipe, InitRecipe::ToOpenai);
     }
 }
