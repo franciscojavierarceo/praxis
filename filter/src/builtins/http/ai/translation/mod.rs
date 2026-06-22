@@ -7,7 +7,14 @@ pub(crate) mod chat_completions;
 
 #[cfg(test)]
 #[expect(clippy::allow_attributes, reason = "blanket test suppressions")]
-#[allow(clippy::expect_used, clippy::indexing_slicing, clippy::unwrap_used, reason = "tests")]
+#[allow(
+    clippy::cognitive_complexity,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::too_many_lines,
+    clippy::unwrap_used,
+    reason = "tests"
+)]
 mod tests {
     use serde_json::{Value, json};
 
