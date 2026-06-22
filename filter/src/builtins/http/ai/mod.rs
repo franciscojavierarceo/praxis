@@ -22,6 +22,13 @@ mod prompt_enrich;
 pub(crate) mod store;
 #[cfg(feature = "ai-inference")]
 pub(crate) mod token_usage;
+#[cfg(feature = "ai-inference")]
+#[expect(clippy::allow_attributes, reason = "dead_code expect unfulfilled on module")]
+#[allow(
+    dead_code,
+    reason = "stream translation helper awaits runtime Responses stream-events filter wiring"
+)]
+pub(crate) mod translation;
 
 mod token_usage_headers;
 
@@ -40,6 +47,8 @@ pub use anthropic::AnthropicValidateFilter;
 pub use guardrails::AiGuardrailsFilter;
 #[cfg(feature = "ai-inference")]
 pub use inference::ModelToHeaderFilter;
+#[cfg(feature = "ai-inference")]
+pub use openai::OpenaiResponsesToChatCompletionsFilter;
 #[cfg(feature = "ai-inference")]
 pub use openai::OpenaiResponsesValidateFilter;
 #[cfg(feature = "ai-inference")]
