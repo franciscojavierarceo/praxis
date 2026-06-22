@@ -494,6 +494,21 @@ pub(crate) fn chat_stream_chunks_to_response_events(
     Ok(events)
 }
 
+/// Convert `Responses` stream event values into data-only SSE frames.
+pub(crate) fn response_events_to_sse_frames(events: &[Value]) -> Vec<String> {
+    events.iter().map(response_event_to_sse_frame).collect()
+}
+
+/// Convert one `Responses` stream event value into a data-only SSE frame.
+fn response_event_to_sse_frame(event: &Value) -> String {
+    let payload = event.to_string();
+    let mut frame = String::with_capacity("data: \n\n".len() + payload.len());
+    frame.push_str("data: ");
+    frame.push_str(&payload);
+    frame.push_str("\n\n");
+    frame
+}
+
 /// Values that vary between response resource snapshots.
 #[derive(Debug)]
 struct ResponseResourceParts<'a> {

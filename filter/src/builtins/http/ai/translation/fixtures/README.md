@@ -8,5 +8,6 @@ Source files:
 
 - `tests/integration/openresponses/recordings/4c4e47bc4f678d0bfe2597c94ac494f58e220f9930c15fa31c9751f775f639a9.json`
 - `tests/integration/openresponses/recordings/0b2ecda82eebaaeeab01dfeb3ead9e607ea9a0dd2380e5255eeb9c623d4e228e.json`
+- `src/ogx_api/responses/fastapi_routes.py` (`create_sse_event`)
 
 OGX is MIT licensed.

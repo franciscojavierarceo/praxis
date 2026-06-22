@@ -370,4 +370,65 @@ mod tests {
             "terminal snapshot remains schema-complete"
         );
     }
+
+    #[test]
+    fn ogx_chat_stream_events_map_to_responses_sse_frames() {
+        let fixture = ogx_stream_fixture();
+        let chunks = fixture["chunks"].as_array().unwrap();
+        let context = super::chat_completions::ResponseContext {
+            response_id: "resp_stream".to_owned(),
+            created_at: 0,
+            model: "gpt-4o-mini".to_owned(),
+            instructions: None,
+            input: json!("Remember the code word: ember. Reply with OK."),
+            metadata: json!({}),
+            temperature: None,
+            top_p: None,
+            max_output_tokens: None,
+            parallel_tool_calls: true,
+            previous_response_id: None,
+            store: true,
+            tools: Vec::new(),
+            tool_choice: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            top_logprobs: None,
+            service_tier: None,
+        };
+        let events = super::chat_completions::chat_stream_chunks_to_response_events(chunks, &context).unwrap();
+
+        let frames = super::chat_completions::response_events_to_sse_frames(&events);
+
+        assert_eq!(
+            frames.len(),
+            events.len(),
+            "each Responses event should become one SSE frame"
+        );
+        for (frame, event) in frames.iter().zip(events.iter()) {
+            assert!(
+                frame.starts_with("data: "),
+                "OGX/OpenAI Responses SSE frames use data-only events"
+            );
+            assert!(frame.ends_with("\n\n"), "SSE frames are separated by a blank line");
+            let payload = frame
+                .strip_prefix("data: ")
+                .and_then(|body| body.strip_suffix("\n\n"))
+                .unwrap();
+            let parsed: Value = serde_json::from_str(payload).unwrap();
+
+            assert_eq!(&parsed, event, "SSE frame payload should be the original event JSON");
+        }
+        assert_eq!(
+            frames[4],
+            concat!(
+                r#"data: {"content_index":0,"delta":"OK","item_id":"msg_resp_stream","logprobs":[],"output_index":0,"sequence_number":4,"type":"response.output_text.delta"}"#,
+                "\n\n"
+            ),
+            "text delta frame matches OGX's data-only SSE transport shape"
+        );
+        assert!(
+            frames.iter().all(|frame| !frame.contains("[DONE]")),
+            "OGX Responses SSE streams terminate with response.completed, not a [DONE] sentinel"
+        );
+    }
 }
