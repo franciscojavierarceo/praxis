@@ -2490,6 +2490,7 @@ name = "praxis-proxy-core"
 version = "0.3.1"
 dependencies = [
  "dashmap 6.2.1",
+ "http",
  "praxis-proxy-tls",
  "quixotic-plecostomus-core",
  "rand 0.10.1",
@@ -2629,6 +2630,7 @@ dependencies = [
  "rcgen",
  "rustls",
  "rustls-pemfile",
+ "serde",
  "serde_json",
  "tempfile",
  "tokio",
